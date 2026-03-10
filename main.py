@@ -15,6 +15,7 @@ SQUARE_API_KEY = os.getenv("SQUARE_API_KEY")
 if SQUARE_API_KEY:
     SQUARE_API_KEY = SQUARE_API_KEY.strip() # Limpieza de seguridad: elimina espacios al inicio/final
 MODO_PRUEBA = os.getenv("MODO_PRUEBA", "True").lower() == "true" # 🟢 Configurable. Por defecto True si no se especifica.
+GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama3-8b-8192") # Modelo de Groq, configurable desde el workflow.
 ARCHIVO_HISTORIAL = "historial.json"
 
 # Validación básica de seguridad
@@ -99,42 +100,20 @@ def obtener_moneda_tendencia():
                 continue
             candidatos.append(t)
 
-        # Buscamos en el TOP 10 de los CANDIDATOS (no repetidos) la primera moneda con logo
-        for ticker in candidatos[:10]:
-            symbol = ticker['symbol'].replace('USDT', '')
-            
-            # Probamos múltiples fuentes de iconos para asegurar imagen
-            candidates = [
-                f"https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/{symbol.lower()}.png",
-                f"https://assets.coincap.io/assets/icons/{symbol.lower()}@2x.png"
-            ]
-            
-            for url in candidates:
-                try:
-                    if requests.head(url, timeout=2).status_code == 200:
-                        return {
-                            "symbol": symbol,
-                            "percent": ticker['priceChangePercent'],
-                            "lastPrice": ticker['lastPrice'],
-                            "logo_url": url
-                        }
-                except:
-                    continue
-            
-            print(f"ℹ️ Saltando {symbol} (Top Gainer) porque no se encontró logo.")
-
         if not candidatos:
             print("⚠️ Todas las monedas trending han sido publicadas recientemente.")
             return None
 
-        # Fallback: Si ninguna tiene logo, devolvemos la #1 de los candidatos sin imagen
+        # Tomamos la primera moneda candidata que no ha sido publicada recientemente.
         top_ticker = candidatos[0]
         symbol = top_ticker['symbol'].replace('USDT', '')
+        
+        print(f"ℹ️ Moneda seleccionada: {symbol}. No se buscará logo para agilizar.")
+
         return {
             "symbol": symbol,
             "percent": top_ticker['priceChangePercent'],
-            "lastPrice": top_ticker['lastPrice'],
-            "logo_url": None
+            "lastPrice": top_ticker['lastPrice']
         }
     except Exception as e:
         print(f"⚠️ Error obteniendo datos de Binance: {e}")
@@ -175,8 +154,8 @@ def generar_post_inteligente(datos_mercado):
     try:
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            # Usamos el modelo estándar y recomendado de Groq para Llama3 70B
-            model="llama3.1-70b-versatile", # ¡NUEVO! Modelo Llama 3.1 (Julio 2024)
+            # Usamos un modelo configurable desde el workflow para evitar errores de "decommissioned"
+            model=GROQ_MODEL_NAME,
             temperature=0.7
         )
         return chat_completion.choices[0].message.content
@@ -184,7 +163,7 @@ def generar_post_inteligente(datos_mercado):
         print(f"⚠️ Error generando texto con Groq: {e}")
         return None
 
-def publicar_en_square(contenido, imagen_url):
+def publicar_en_square(contenido):
     """
     3. Publicación Automática:
     Envía el contenido a Binance Square (Solo texto para asegurar entrega).
@@ -237,11 +216,9 @@ if __name__ == "__main__":
     
     if tendencia:
         print(f"📈 Tendencia detectada: {tendencia['symbol']} ({tendencia['percent']}%)")
-        if tendencia['logo_url']:
-            print(f"🖼️  Logo encontrado: {tendencia['logo_url']}")
         post_final = generar_post_inteligente(tendencia)
         if post_final:
-            if publicar_en_square(post_final, tendencia['logo_url']):
+            if publicar_en_square(post_final):
                 # Guardamos en el historial para no repetir SOLO si hubo éxito
                 guardar_historial(tendencia['symbol'])
                 print(f"💾 Guardado {tendencia['symbol']} en el historial.")
