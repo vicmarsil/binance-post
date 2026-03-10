@@ -9,7 +9,7 @@ on:
         description: 'Modo Prueba (True = No publicar)'
         required: true
         default: 'False'
-        type: boolean
+        type: boolean 
 
 jobs:
   build:
