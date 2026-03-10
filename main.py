@@ -14,7 +14,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 SQUARE_API_KEY = os.getenv("SQUARE_API_KEY")
 if SQUARE_API_KEY:
     SQUARE_API_KEY = SQUARE_API_KEY.strip() # Limpieza de seguridad: elimina espacios al inicio/final
-MODO_PRUEBA = os.getenv("MODO_PRUEBA", "True").lower() == "true" # 🟢 Configurable. Por defecto True si no se especifica.
+MODO_PRUEBA = os.getenv("MODO_PRUEBA", "False").lower() == "true" # 🟢 Configurable. Por defecto False (Producción).
 GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama-3.3-70b-versatile") # Modelo de Groq, configurable desde el workflow.
 
 # 🛡️ Parche de seguridad: Si el entorno (.env local) tiene el modelo viejo, forzamos el nuevo.
@@ -160,8 +160,8 @@ def generar_post_inteligente(datos_mercado):
     try:
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            # Usamos un modelo configurable desde el workflow para evitar errores de "decommissioned"
-            model=GROQ_MODEL_NAME,
+            # Modelo actualizado: llama-3.3-70b-versatile
+            model="llama-3.3-70b-versatile",
             temperature=0.7
         )
         return chat_completion.choices[0].message.content
