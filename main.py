@@ -46,7 +46,8 @@ def obtener_moneda_tendencia():
     Obtiene la moneda con mayor cambio porcentual positivo (Top Gainer) en las últimas 24h.
     """
     try:
-        url = "https://api.binance.com/api/v3/ticker/24hr"
+        # Usamos data-api.binance.vision para evitar error 451 (Geo-bloqueo en GitHub Actions/US)
+        url = "https://data-api.binance.vision/api/v3/ticker/24hr"
         response = requests.get(url)
         response.raise_for_status()
         data = response.json()
