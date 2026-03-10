@@ -12,7 +12,7 @@ import time
 # --- CONFIGURACIÓN Y VARIABLES DE ENTORNO ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 SQUARE_API_KEY = os.getenv("SQUARE_API_KEY")
-MODO_PRUEBA = True  # 🟢 True = Solo imprime en consola. False = Publica en Binance.
+MODO_PRUEBA = os.getenv("MODO_PRUEBA", "True").lower() == "true" # 🟢 Configurable. Por defecto True si no se especifica.
 ARCHIVO_HISTORIAL = "historial.json"
 
 # Validación básica de seguridad
@@ -63,7 +63,7 @@ def obtener_moneda_tendencia():
         candidatos = []
         
         for t in sorted_tickers:
-            symbol = ticker['symbol'].replace('USDT', '')
+            symbol = t['symbol'].replace('USDT', '')
             if symbol in historial and (ahora - historial[symbol] < 86400):
                 continue
             candidatos.append(t)
@@ -129,7 +129,7 @@ def generar_post_inteligente(datos_mercado):
     
     TAREA: Escribe un post para Binance Square optimizado para monetización.
     REGLAS:
-    - Máximo 800 caracteres.
+    - Máximo 500 caracteres.
     - OBLIGATORIO: Incluye los cashtags ${moneda} y $BNB.
     - Tono: Profesional, objetivo, sin promesas de ganancias ("to the moon").
     - Estructura:
