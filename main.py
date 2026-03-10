@@ -12,12 +12,18 @@ import time
 # --- CONFIGURACIÓN Y VARIABLES DE ENTORNO ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 SQUARE_API_KEY = os.getenv("SQUARE_API_KEY")
+if SQUARE_API_KEY:
+    SQUARE_API_KEY = SQUARE_API_KEY.strip() # Limpieza de seguridad: elimina espacios al inicio/final
 MODO_PRUEBA = os.getenv("MODO_PRUEBA", "True").lower() == "true" # 🟢 Configurable. Por defecto True si no se especifica.
 ARCHIVO_HISTORIAL = "historial.json"
 
 # Validación básica de seguridad
 if not GROQ_API_KEY:
     raise ValueError("❌ Error: La variable GROQ_API_KEY no está configurada.")
+if not MODO_PRUEBA and not SQUARE_API_KEY:
+    raise ValueError("❌ Error: SQUARE_API_KEY es necesaria para publicar (MODO_PRUEBA=False). Revisa tus Secretos en GitHub.")
+if not MODO_PRUEBA:
+    print(f"🔑 SQUARE_API_KEY cargada correctamente (Longitud: {len(SQUARE_API_KEY)})")
 
 client = Groq(api_key=GROQ_API_KEY)
 
@@ -53,11 +59,15 @@ def obtener_moneda_tendencia():
         "https://api3.binance.com/api/v3/ticker/24hr"
     ]
 
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+
     data = None
     for url in endpoints:
         try:
             print(f"📡 Probando conexión con: {url}")
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, headers=headers, timeout=10)
             if response.status_code == 200:
                 data = response.json()
                 break
@@ -153,6 +163,7 @@ def generar_post_inteligente(datos_mercado):
     - Máximo 500 caracteres.
     - OBLIGATORIO: Incluye los cashtags ${moneda} y $BNB.
     - Tono: Profesional, objetivo, sin promesas de ganancias ("to the moon").
+    - No incluyas URLs, solo texto y cashtags.
     - Estructura:
         1. Título atractivo (ej: "🚀 Análisis de {moneda}").
         2. Dato clave (precio y % de cambio).
@@ -164,8 +175,8 @@ def generar_post_inteligente(datos_mercado):
     try:
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            # He cambiado el modelo a uno estándar de Groq y ajustado la temperatura para un texto más rico
-            model="llama-3.3-70b-versatile",
+            # Usamos el modelo estándar y recomendado de Groq para Llama3 70B
+            model="llama3-70b-8192",
             temperature=0.7
         )
         return chat_completion.choices[0].message.content
@@ -176,46 +187,49 @@ def generar_post_inteligente(datos_mercado):
 def publicar_en_square(contenido, imagen_url):
     """
     3. Publicación Automática:
-    Envía el contenido y una imagen (si está disponible) a Binance Square.
+    Envía el contenido a Binance Square (Solo texto para asegurar entrega).
     """
     if MODO_PRUEBA:
         print(f"\n🧪 [MODO PRUEBA] Simulación de envío a Binance Square:")
         print(f"--------------------------------------------------")
-        if imagen_url:
-            print(f"Imagen: {imagen_url}")
-        else:
-            print("Imagen: No se adjuntará imagen.")
         print(f"Texto:\n{contenido}")
         print(f"--------------------------------------------------")
-        return
+        return True
 
+    # Endpoint oficial para AI Skills / Short Posts
     url = "https://www.binance.com/bapi/composite/v1/public/pgc/openApi/content/add"
+    
     headers = {
         "X-Square-OpenAPI-Key": SQUARE_API_KEY,
         "Content-Type": "application/json",
-        "clienttype": "binanceSkill"
+        "clienttype": "binanceSkill" # Este campo es vital para que Binance sepa que es un Skill
     }
-    # El payload cambia si hay imagen o no
-    if imagen_url:
-        payload = {
-            "body": contenido,
-            "imageUrls": [imagen_url]
-        }
-        print(f"📡 Enviando post con imagen a Binance Square...")
-    else:
-        payload = {"bodyTextOnly": contenido}
-        print(f"📡 Enviando post (solo texto) a Binance Square...")
+
+    # Intentamos primero solo con texto para asegurar que la cuenta está activa
+    # Binance a veces rechaza URLs de imágenes externas por seguridad
+    payload = {
+        "bodyTextOnly": contenido 
+    }
+    
+    print(f"📡 Enviando post (solo texto) a Binance Square...")
     
     try:
         response = requests.post(url, headers=headers, json=payload)
-        if response.status_code == 200:
-            print("🚀 ¡POST PUBLICADO REALMENTE EN BINANCE SQUARE!")
+        resultado = response.json()
+        
+        # El código "000000" es el éxito real en Binance
+        if resultado.get("code") == "000000":
+            # Intentamos obtener el ID de forma segura
+            post_id = resultado.get('data', {}).get('id', 'Desconocido')
+            print(f"🚀 PUBLICADO! ID del Post: {post_id}")
+            return True
         else:
-            # Imprimimos el error de forma más clara
-            print(f"❌ Error al publicar ({response.status_code}): {response.text}")
+            print(f"❌ Binance rechazó el post: {resultado.get('message')} (Código: {resultado.get('code')})")
+            return False
 
     except Exception as e:
-        print(f"⚠️ Error de red: {e}")
+        print(f"⚠️ Error técnico: {e}")
+        return False
 
 if __name__ == "__main__":
     print("🤖 Iniciando Bot vIcmAr...")
@@ -227,8 +241,9 @@ if __name__ == "__main__":
             print(f"🖼️  Logo encontrado: {tendencia['logo_url']}")
         post_final = generar_post_inteligente(tendencia)
         if post_final:
-            publicar_en_square(post_final, tendencia['logo_url'])
-            
-            # Guardamos en el historial para no repetir
-            guardar_historial(tendencia['symbol'])
-            print(f"💾 Guardado {tendencia['symbol']} en el historial.")
+            if publicar_en_square(post_final, tendencia['logo_url']):
+                # Guardamos en el historial para no repetir SOLO si hubo éxito
+                guardar_historial(tendencia['symbol'])
+                print(f"💾 Guardado {tendencia['symbol']} en el historial.")
+            else:
+                print(f"⚠️ No se actualizó el historial para permitir reintento.")
