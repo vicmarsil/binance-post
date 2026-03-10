@@ -221,6 +221,7 @@ def publicar_en_square(contenido):
 
 if __name__ == "__main__":
     print("🤖 Iniciando Bot vIcmAr...")
+    print(f"⚙️ Versión 2.0 - Modelo Configurado: {GROQ_MODEL_NAME}")
     tendencia = obtener_moneda_tendencia()
     
     if tendencia:
