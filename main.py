@@ -33,7 +33,8 @@ def cargar_historial():
         try:
             with open(ARCHIVO_HISTORIAL, "r") as f:
                 return json.load(f)
-        except:
+        except json.JSONDecodeError:
+            print(f"⚠️ Advertencia: El archivo {ARCHIVO_HISTORIAL} está corrupto o vacío. Se creará uno nuevo.")
             return {}
     return {}
 
