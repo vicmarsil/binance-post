@@ -176,7 +176,7 @@ def generar_post_inteligente(datos_mercado):
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
             # Usamos el modelo estándar y recomendado de Groq para Llama3 70B
-            model="llama-3.1-70b-versatile", # Modelo actualizado recomendado por Groq
+            model="llama3.1-70b-versatile", # ¡NUEVO! Modelo Llama 3.1 (Julio 2024)
             temperature=0.7
         )
         return chat_completion.choices[0].message.content
