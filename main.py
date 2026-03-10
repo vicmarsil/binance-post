@@ -15,10 +15,12 @@ SQUARE_API_KEY = os.getenv("SQUARE_API_KEY")
 if SQUARE_API_KEY:
     SQUARE_API_KEY = SQUARE_API_KEY.strip() # Limpieza de seguridad: elimina espacios al inicio/final
 MODO_PRUEBA = os.getenv("MODO_PRUEBA", "False").lower() == "true" # 🟢 Configurable. Por defecto False (Producción).
-GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama-3.3-70b-versatile") # Modelo de Groq, configurable desde el workflow.
+GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama-3.3-70b-versatile").strip() # .strip() elimina espacios fantasma
 
 # 🛡️ Parche de seguridad: Si el entorno (.env local) tiene el modelo viejo, forzamos el nuevo.
-if GROQ_MODEL_NAME == "llama3-8b-8192":
+# Usamos 'in' para detectar variantes con espacios o comillas
+if "llama3-8b-8192" in GROQ_MODEL_NAME:
+    print("⚠️ Configuración detectada con modelo deprecado. Actualizando automáticamente a llama-3.3-70b-versatile.")
     GROQ_MODEL_NAME = "llama-3.3-70b-versatile"
 
 ARCHIVO_HISTORIAL = "historial.json"
@@ -158,10 +160,11 @@ def generar_post_inteligente(datos_mercado):
     """
 
     try:
+        print(f"🤖 Intentando conectar con Groq usando modelo: '{GROQ_MODEL_NAME}'")
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            # 🔒 Forzamos el modelo nuevo directamente (Hardcoded) para evitar errores de variables ocultas
-            model="llama-3.3-70b-versatile",
+            # Usamos la variable saneada
+            model=GROQ_MODEL_NAME,
             temperature=0.7
         )
         return chat_completion.choices[0].message.content
