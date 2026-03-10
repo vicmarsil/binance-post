@@ -16,6 +16,11 @@ if SQUARE_API_KEY:
     SQUARE_API_KEY = SQUARE_API_KEY.strip() # Limpieza de seguridad: elimina espacios al inicio/final
 MODO_PRUEBA = os.getenv("MODO_PRUEBA", "True").lower() == "true" # 🟢 Configurable. Por defecto True si no se especifica.
 GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama-3.3-70b-versatile") # Modelo de Groq, configurable desde el workflow.
+
+# 🛡️ Parche de seguridad: Si el entorno (.env local) tiene el modelo viejo, forzamos el nuevo.
+if GROQ_MODEL_NAME == "llama3-8b-8192":
+    GROQ_MODEL_NAME = "llama-3.3-70b-versatile"
+
 ARCHIVO_HISTORIAL = "historial.json"
 
 # Validación básica de seguridad
