@@ -45,12 +45,32 @@ def obtener_moneda_tendencia():
     1. Monitorizar el mercado:
     Obtiene la moneda con mayor cambio porcentual positivo (Top Gainer) en las últimas 24h.
     """
+    endpoints = [
+        "https://data-api.binance.vision/api/v3/ticker/24hr",
+        "https://api.binance.com/api/v3/ticker/24hr",
+        "https://api1.binance.com/api/v3/ticker/24hr",
+        "https://api2.binance.com/api/v3/ticker/24hr",
+        "https://api3.binance.com/api/v3/ticker/24hr"
+    ]
+
+    data = None
+    for url in endpoints:
+        try:
+            print(f"📡 Probando conexión con: {url}")
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                break
+            else:
+                print(f"⚠️ Falló {url} con código {response.status_code}")
+        except Exception as e:
+            print(f"❌ Error conectando a {url}: {e}")
+            continue
+
+    if not data:
+        return None
+
     try:
-        # Usamos data-api.binance.vision para evitar error 451 (Geo-bloqueo en GitHub Actions/US)
-        url = "https://data-api.binance.vision/api/v3/ticker/24hr"
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
         
         # Filtramos solo pares con USDT para asegurar liquidez y relevancia
         tickers = [t for t in data if t['symbol'].endswith('USDT')]
