@@ -233,6 +233,101 @@ def generar_post_fng(datos_fng):
         print(f"⚠️ Error generando texto F&G con Groq: {e}")
         return None
 
+def calcular_rsi(symbol, period=14):
+    """
+    Calcula el RSI (1h) para detectar sobreventa.
+    """
+    try:
+        url = "https://api.binance.com/api/v3/klines"
+        # Traemos 100 velas de 1h para calcular bien el promedio
+        params = {'symbol': symbol, 'interval': '1h', 'limit': 100}
+        response = requests.get(url, params=params, timeout=5)
+        data = response.json()
+        
+        if not data or len(data) < period + 1:
+            return None, None
+
+        closes = [float(x[4]) for x in data]
+        
+        # Cálculo manual de RSI
+        gains = []
+        losses = []
+        
+        for i in range(1, len(closes)):
+            delta = closes[i] - closes[i-1]
+            gains.append(max(delta, 0))
+            losses.append(max(-delta, 0))
+            
+        # Promedio inicial
+        avg_gain = sum(gains[:period]) / period
+        avg_loss = sum(losses[:period]) / period
+        
+        # Suavizado (Wilder's Smoothing)
+        for i in range(period, len(gains)):
+            avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+            avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+            
+        if avg_loss == 0:
+            rsi = 100
+        else:
+            rs = avg_gain / avg_loss
+            rsi = 100 - (100 / (1 + rs))
+            
+        return rsi, closes[-1]
+    except Exception as e:
+        return None, None
+
+def verificar_rsi_majors():
+    # Monedas 'Blue Chip' para buscar oportunidades de oro
+    majors = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT']
+    print("🔍 Escaneando oportunidades RSI en Majors (BTC, ETH, BNB, SOL)...")
+    
+    for symbol in majors:
+        rsi, precio = calcular_rsi(symbol)
+        if rsi is not None and rsi < 30: # Nivel de Sobreventa
+            print(f"🚨 ¡ALERTA! {symbol} con RSI {rsi:.2f} (Sobreventa)")
+            return {
+                "symbol": symbol.replace('USDT', ''),
+                "rsi": rsi,
+                "price": precio
+            }
+    return None
+
+def generar_post_rsi(datos):
+    moneda = datos['symbol']
+    rsi = int(datos['rsi'])
+    precio = "{:.2f}".format(datos['price'])
+    
+    prompt = f"""
+    Actúa como un trader veterano de Binance Square.
+    DATOS: {moneda} está en zona de SOBREVENTA (RSI: {rsi}) en gráfico de 1h. Precio: {precio}.
+    
+    OBJETIVO: Alerta de "Buy the Dip" (Oportunidad de rebote).
+    
+    ESTRUCTURA:
+    1. 🔔 TÍTULO: "¡ATENCIÓN {moneda} EN ZONA DE COMPRA!" o "💎 Oportunidad en {moneda}".
+    2. 📉 EL DATO: RSI en {rsi}/100 (Extrema sobreventa).
+    3. 🧠 ANÁLISIS: "Históricamente, tocar estos niveles suele anticipar un rebote técnico a corto plazo."
+    4. 🎯 CONCLUSIÓN: Zona clave para vigilar o acumular.
+    5. 👇 CIERRE: "Dale Like ❤️ si crees que rebota aquí 📈".
+    
+    REGLAS:
+    - Máximo 500 caracteres.
+    - OBLIGATORIO: Cashtags ${moneda} #BuyTheDip #{moneda}
+    """
+    # Reutilizamos la lógica de conexión a Groq copiando el bloque try/except simple
+    try:
+        print(f"🤖 Generando alerta RSI con modelo: '{GROQ_MODEL_NAME}'")
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model=GROQ_MODEL_NAME,
+            temperature=0.7
+        )
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        print(f"⚠️ Error generando texto RSI: {e}")
+        return None
+
 def publicar_en_square(contenido):
     """
     3. Publicación Automática:
@@ -296,15 +391,27 @@ if __name__ == "__main__":
     
     else:
         # --- MODO TENDENCIA (Por defecto) ---
-        tendencia = obtener_moneda_tendencia()
         
-        if tendencia:
-            print(f"📈 Tendencia detectada: {tendencia['symbol']} ({tendencia['percent']}%)")
-            post_final = generar_post_inteligente(tendencia)
-            if post_final:
-                if publicar_en_square(post_final):
-                    # Guardamos en el historial para no repetir SOLO si hubo éxito
-                    guardar_historial(tendencia['symbol'])
-                    print(f"💾 Guardado {tendencia['symbol']} en el historial.")
-                else:
-                    print(f"⚠️ No se actualizó el historial para permitir reintento.")
+        # 1. Primero buscamos oportunidades VIP (RSI < 30 en Majors)
+        # Esto tiene prioridad sobre las monedas random que suben.
+        alerta_rsi = verificar_rsi_majors()
+        
+        if alerta_rsi:
+            post_rsi = generar_post_rsi(alerta_rsi)
+            if post_rsi and publicar_en_square(post_rsi):
+                # Guardamos con sufijo _RSI para no repetir la alerta en 24h
+                guardar_historial(f"{alerta_rsi['symbol']}_RSI")
+                print(f"💾 Alerta RSI de {alerta_rsi['symbol']} guardada.")
+        
+        else:
+            # 2. Si no hay alertas VIP, buscamos tendencia normal (Top Gainers)
+            tendencia = obtener_moneda_tendencia()
+            if tendencia:
+                print(f"📈 Tendencia detectada: {tendencia['symbol']} ({tendencia['percent']}%)")
+                post_final = generar_post_inteligente(tendencia)
+                if post_final:
+                    if publicar_en_square(post_final):
+                        guardar_historial(tendencia['symbol'])
+                        print(f"💾 Guardado {tendencia['symbol']} en el historial.")
+                    else:
+                        print(f"⚠️ No se actualizó el historial para permitir reintento.")
