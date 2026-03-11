@@ -142,20 +142,26 @@ def generar_post_inteligente(datos_mercado):
         instruccion_extra = "- MENCIONA: Niveles de Sobrecompra (RSI) o Soportes clave para dar imagen de experto."
 
     prompt = f"""
-    Actúa como un analista experto de criptomonedas para la marca 'vIcmAr'.
+    Actúa como un 'Top Creator' de Binance Square (estilo influencer inteligente y viral).
     DATOS: {moneda} cotiza a {precio} USDT (+{cambio}% en 24h).
     
-    TAREA: Escribe un post para Binance Square optimizado para monetización.
+    OBJETIVO: Escribir un post que genere likes y seguidores.
+    
+    ESTILO (Imita a los mejores):
+    - Usa emojis visuales al inicio de las frases importantes.
+    - Párrafos muy cortos y espaciosos.
+    - Tono: Entusiasta, directo y con autoridad.
+    
+    ESTRUCTURA OBLIGATORIA:
+    1. 🚨 GANCHO VISUAL: Título urgente (Ej: "¡{moneda} SE MUEVE!" o "🚀 ¿Oportunidad en {moneda}?").
+    2. 📊 EL DATO: Precio actual y subida.
+    3. 🧠 ANÁLISIS FLASH: ¿Por qué sube? (Volumen / Rompió resistencia / Hype). Sé breve.
+    4. 🎯 CONCLUSIÓN RÁPIDA: ¿Sigue subiendo o esperamos?
+    5. 👇 CIERRE VIRAL: "Dale Like ❤️ y Sígueme para más alertas 🦁".
+    
     REGLAS:
     - Máximo 500 caracteres.
-    - OBLIGATORIO: Incluye los cashtags ${moneda} y $BNB.
-    - Tono: Profesional, objetivo, sin promesas de ganancias ("to the moon").
-    - No incluyas URLs, solo texto y cashtags.
-    - Estructura:
-        1. Título atractivo (ej: "🚀 Análisis de {moneda}").
-        2. Dato clave (precio y % de cambio).
-        3. Análisis breve pero sustancioso: Menciona posibles catalizadores (noticias, volumen) o indicadores técnicos simples (como el RSI si hay sobrecompra).
-        4. Pregunta de cierre para fomentar la interacción.
+    - OBLIGATORIO: Cashtags ${moneda}, $BNB y #{moneda}.
     {instruccion_extra}
     """
 
