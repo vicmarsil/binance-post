@@ -134,7 +134,9 @@ def generar_post_inteligente(datos_mercado):
     """
     moneda = datos_mercado['symbol']
     cambio = datos_mercado['percent']
-    precio = datos_mercado['lastPrice']
+    
+    # Formateo visual "Limpieza Pro": Quita ceros extra (Ej: 0.5000 -> 0.5 | 0.00976000 -> 0.00976)
+    precio = "{:.8f}".format(float(datos_mercado['lastPrice'])).rstrip("0").rstrip(".")
 
     # Lógica para mejorar el gancho (Hook) si la subida es fuerte
     instruccion_extra = ""
