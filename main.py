@@ -16,6 +16,7 @@ if SQUARE_API_KEY:
     SQUARE_API_KEY = SQUARE_API_KEY.strip() # Limpieza de seguridad: elimina espacios al inicio/final
 MODO_PRUEBA = os.getenv("MODO_PRUEBA", "False").lower() == "true" # 🟢 Configurable. Por defecto False (Producción).
 GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama-3.3-70b-versatile").strip() # .strip() elimina espacios fantasma
+TIPO_BOT = os.getenv("TIPO_BOT", "TENDENCIA") # 🟢 Nuevo: Selecciona el modo de operación
 
 # 🛡️ Parche de seguridad: Si el entorno (.env local) tiene el modelo viejo, forzamos el nuevo.
 # Usamos 'in' para detectar variantes con espacios o comillas
@@ -180,6 +181,58 @@ def generar_post_inteligente(datos_mercado):
         print(f"⚠️ Error generando texto con Groq: {e}")
         return None
 
+def obtener_fear_and_greed():
+    """
+    Obtiene el índice de Miedo y Codicia desde alternative.me
+    """
+    try:
+        url = "https://api.alternative.me/fng/?limit=1"
+        print(f"📡 Consultando Fear & Greed Index...")
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        if data['data']:
+            return data['data'][0]
+    except Exception as e:
+        print(f"⚠️ Error obteniendo F&G Index: {e}")
+    return None
+
+def generar_post_fng(datos_fng):
+    valor = datos_fng['value']
+    clasificacion = datos_fng['value_classification']
+    
+    prompt = f"""
+    Actúa como un 'Top Creator' de Binance Square.
+    DATOS: Índice de Miedo y Codicia (Fear & Greed): {valor}/100 ({clasificacion}).
+    
+    OBJETIVO: Post diario de sentimiento de mercado (Viral).
+    
+    ESTILO:
+    - Emojis al inicio.
+    - Párrafos cortos.
+    - Tono: Experto pero cercano.
+    
+    ESTRUCTURA:
+    1. 🌡️ TÍTULO: "SENTIMIENTO CRYPTO: {clasificacion}" (Elige emoji: 🥶 Miedo / 🤑 Codicia).
+    2. 📊 EL DATO: Estamos en {valor}/100.
+    3. 🧠 ANÁLISIS: Breve interpretación psicológica del mercado hoy.
+    4. 👇 CIERRE: "¿Compras o vendes en este nivel? Te leo 👇 #Bitcoin #FearAndGreed"
+    
+    REGLAS:
+    - Máximo 500 caracteres.
+    """
+    
+    try:
+        print(f"🤖 Generando análisis de sentimiento con modelo: '{GROQ_MODEL_NAME}'")
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model=GROQ_MODEL_NAME,
+            temperature=0.7
+        )
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        print(f"⚠️ Error generando texto F&G con Groq: {e}")
+        return None
+
 def publicar_en_square(contenido):
     """
     3. Publicación Automática:
@@ -229,16 +282,29 @@ def publicar_en_square(contenido):
 
 if __name__ == "__main__":
     print("🤖 Iniciando Bot vIcmAr...")
-    print(f"⚙️ Versión 2.0 - Modelo Configurado: {GROQ_MODEL_NAME}")
-    tendencia = obtener_moneda_tendencia()
+    print(f"⚙️ Versión 2.1 - Modelo: {GROQ_MODEL_NAME} | Modo: {TIPO_BOT}")
     
-    if tendencia:
-        print(f"📈 Tendencia detectada: {tendencia['symbol']} ({tendencia['percent']}%)")
-        post_final = generar_post_inteligente(tendencia)
-        if post_final:
-            if publicar_en_square(post_final):
-                # Guardamos en el historial para no repetir SOLO si hubo éxito
-                guardar_historial(tendencia['symbol'])
-                print(f"💾 Guardado {tendencia['symbol']} en el historial.")
-            else:
-                print(f"⚠️ No se actualizó el historial para permitir reintento.")
+    if TIPO_BOT == "FNG":
+        # --- MODO FEAR & GREED ---
+        datos = obtener_fear_and_greed()
+        if datos:
+            print(f"🌡️ Índice obtenido: {datos['value']} ({datos['value_classification']})")
+            post = generar_post_fng(datos)
+            if post:
+                publicar_en_square(post)
+                # Nota: No guardamos historial para F&G porque es un post diario único.
+    
+    else:
+        # --- MODO TENDENCIA (Por defecto) ---
+        tendencia = obtener_moneda_tendencia()
+        
+        if tendencia:
+            print(f"📈 Tendencia detectada: {tendencia['symbol']} ({tendencia['percent']}%)")
+            post_final = generar_post_inteligente(tendencia)
+            if post_final:
+                if publicar_en_square(post_final):
+                    # Guardamos en el historial para no repetir SOLO si hubo éxito
+                    guardar_historial(tendencia['symbol'])
+                    print(f"💾 Guardado {tendencia['symbol']} en el historial.")
+                else:
+                    print(f"⚠️ No se actualizó el historial para permitir reintento.")
