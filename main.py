@@ -362,13 +362,14 @@ def generar_articulo_blog(datos):
     - Frases OBLIGATORIAS (En Inglés): "From my terminal in Argentina...", "Analyzing my script logs...", "The algorithm detected...".
     - Enfoque: Técnico pero explicativo. Enseña qué es el RSI o el volumen mientras analizas.
     - NO uses frases genéricas de IA como "In today's digital world". Sé crudo, directo y 'geek'.
+    - FORMATO: Usa HTML simple compatible con Telegram. Usa <b> para negritas/títulos y <i> para énfasis. NO USES MARKDOWN (** o __).
     
-    ESTRUCTURA MARKDOWN:
-    1. # Título H1 (Llamativo y técnico en Inglés)
+    ESTRUCTURA (HTML):
+    1. <b>Título Principal</b> (Llamativo y técnico)
     2. **INTRODUCCIÓN**: El primer párrafo debe presentar brevemente el proyecto de automatización vIcmAr.
-    3. ## 📟 Console Discovery (Contexto)
-    4. ## ⚙️ Data Analysis (Desglose de precio y RSI)
-    5. ## 🔮 Code Projection (Conclusión)
+    3. <b>📟 Console Discovery</b> (Contexto)
+    4. <b>⚙️ Data Analysis</b> (Desglose de precio y RSI)
+    5. <b>🔮 Code Projection</b> (Conclusión)
     6. **TAGS**: Al final, genera una lista de 5 tags recomendados (ej: #Bitcoin #Trading #AI #RSI #{symbol}).
     
     Longitud: Mínimo 500 palabras.
@@ -477,7 +478,7 @@ def enviar_telegram(mensaje):
         payload = {
             "chat_id": ID_TELEGRAM,
             "text": msg_chunk,
-            "parse_mode": "Markdown",
+            "parse_mode": "HTML",
             "disable_web_page_preview": True
         }
         try:
@@ -493,7 +494,7 @@ def enviar_telegram(mensaje):
                 # Si falla por formato Markdown (muy común con IA), reintentamos sin formato.
                 # Usamos 'elif' para no reintentar si el chat no existe (sería inútil).
                 elif response.status_code == 400:
-                    print("🔄 Reintentando envío sin formato Markdown (texto plano)...")
+                    print("🔄 Reintentando envío sin formato HTML (texto plano)...")
                     payload.pop("parse_mode", None)
                     requests.post(url, json=payload, timeout=10)
             time.sleep(1) # Pequeña pausa para evitar rate limits
@@ -528,15 +529,15 @@ if __name__ == "__main__":
                 guardar_historial(f"{alerta_rsi['symbol']}_RSI")
                 print(f"💾 Alerta RSI de {alerta_rsi['symbol']} guardada.")
                 
-                msg = f"🚨 *ALERTA RSI EXTREMO* 🚨\n" \
+                msg = f"<b>🚨 ALERTA RSI EXTREMO 🚨</b>\n" \
                       f"--------------------------\n" \
-                      f"💎 *Moneda:* {alerta_rsi['symbol']}\n" \
-                      f"💰 *Precio:* {alerta_rsi['price']} USDT\n" \
-                      f"📉 *RSI (1h):* {alerta_rsi['rsi']:.2f}\n" \
+                      f"💎 <b>Moneda:</b> {alerta_rsi['symbol']}\n" \
+                      f"💰 <b>Precio:</b> {alerta_rsi['price']} USDT\n" \
+                      f"📉 <b>RSI (1h):</b> {alerta_rsi['rsi']:.2f}\n" \
                       f"--------------------------\n" \
-                      f"🤖 *vIcmAr Insight:* Zona de sobreventa detectada.\n" \
+                      f"🤖 <b>vIcmAr Insight:</b> Zona de sobreventa detectada.\n" \
                       f"--------------------------\n" \
-                      f"🔗 [Ver Perfil Binance Square](https://www.binance.com/es-LA/square/profile/victormarsilli)"
+                      f"🔗 <a href='https://www.binance.com/es-LA/square/profile/victormarsilli'>Ver Perfil Binance Square</a>"
                 enviar_telegram(msg)
                 
                 # Generar y enviar artículo de blog
@@ -568,16 +569,16 @@ if __name__ == "__main__":
                         rsi_val, _ = calcular_rsi(tendencia['symbol'])
                         rsi_txt = f"{rsi_val:.2f}" if rsi_val else "N/A"
                         
-                        msg = f"🚀 *TENDENCIA DETECTADA* 🚀\n" \
+                        msg = f"<b>🚀 TENDENCIA DETECTADA 🚀</b>\n" \
                               f"--------------------------\n" \
-                              f"🔥 *Moneda:* {tendencia['symbol']}\n" \
-                              f"📈 *Cambio 24h:* +{tendencia['percent']}%\n" \
-                              f"💰 *Precio:* {tendencia['lastPrice']} USDT\n" \
-                              f"📊 *RSI (1h):* {rsi_txt}\n" \
+                              f"🔥 <b>Moneda:</b> {tendencia['symbol']}\n" \
+                              f"📈 <b>Cambio 24h:</b> +{tendencia['percent']}%\n" \
+                              f"💰 <b>Precio:</b> {tendencia['lastPrice']} USDT\n" \
+                              f"📊 <b>RSI (1h):</b> {rsi_txt}\n" \
                               f"--------------------------\n" \
-                              f"🤖 *vIcmAr Insight:* Tendencia detectada por volumen atípico.\n" \
+                              f"🤖 <b>vIcmAr Insight:</b> Tendencia detectada por volumen atípico.\n" \
                               f"--------------------------\n" \
-                              f"🔗 [Ver Perfil Binance Square](https://www.binance.com/es-LA/square/profile/victormarsilli)"
+                              f"🔗 <a href='https://www.binance.com/es-LA/square/profile/victormarsilli'>Ver Perfil Binance Square</a>"
                         enviar_telegram(msg)
                         
                         # Preparamos datos completos para el blog
