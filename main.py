@@ -369,7 +369,7 @@ def generar_articulo_blog(datos):
     3. ## 📟 Console Discovery (Contexto)
     4. ## ⚙️ Data Analysis (Desglose de precio y RSI)
     5. ## 🔮 Code Projection (Conclusión)
-    6. **TAGS**: Al final, genera una lista de 5 tags recomendados (ej: #Crypto #Trading #AI #RSI #{symbol}).
+    6. **TAGS**: Al final, genera una lista de 5 tags recomendados (ej: #Bitcoin #Trading #AI #RSI #{symbol}).
     
     Longitud: Mínimo 500 palabras.
     """
@@ -454,9 +454,24 @@ def enviar_telegram(mensaje):
 
     url = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendMessage"
     
-    # Telegram limita a 4096 caracteres. Usamos 4000 para dar margen.
-    max_length = 4000
-    mensajes_split = [mensaje[i:i+max_length] for i in range(0, len(mensaje), max_length)]
+    # Telegram limita a 4096 caracteres.
+    # Fragmentación inteligente: 2000 chars y corte por saltos de línea para proteger el Markdown.
+    max_length = 2000
+    mensajes_split = []
+    
+    temp_msg = mensaje
+    while len(temp_msg) > 0:
+        if len(temp_msg) <= max_length:
+            mensajes_split.append(temp_msg)
+            break
+        
+        # Cortar en el último salto de línea (o espacio) dentro del límite para no romper etiquetas ** o __
+        corte = temp_msg.rfind('\n', 0, max_length)
+        if corte == -1: corte = temp_msg.rfind(' ', 0, max_length)
+        if corte == -1: corte = max_length
+
+        mensajes_split.append(temp_msg[:corte])
+        temp_msg = temp_msg[corte:].lstrip() # Avanzamos y limpiamos espacios al inicio del siguiente bloque
 
     for i, msg_chunk in enumerate(mensajes_split):
         payload = {
@@ -535,8 +550,8 @@ if __name__ == "__main__":
                     firma = "\n\nOriginally published on my Binance Square profile: https://www.binance.com/es-LA/square/profile/victormarsilli"
                     
                     # Mensajes telegram para copiado fácil
-                    enviar_telegram(f"📝 *BLOG TITLE:*\n{titulo_blog}")
-                    enviar_telegram(f"📄 *BLOG CONTENT (Ready to Paste):*\n\n{contenido_blog + firma}")
+                    enviar_telegram(f"{titulo_blog}")
+                    enviar_telegram(f"{contenido_blog + firma}")
         
         else:
             # 2. Si no hay alertas VIP, buscamos tendencia normal (Top Gainers)
@@ -580,7 +595,7 @@ if __name__ == "__main__":
                             firma = "\n\nOriginally published on my Binance Square profile: https://www.binance.com/es-LA/square/profile/victormarsilli"
                             
                             # Mensajes telegram para copiado fácil
-                            enviar_telegram(f"📝 *BLOG TITLE:*\n{titulo_blog}")
-                            enviar_telegram(f"📄 *BLOG CONTENT (Ready to Paste):*\n\n{contenido_blog + firma}")
+                            enviar_telegram(f"{titulo_blog}")
+                            enviar_telegram(f"{contenido_blog + firma}")
                     else:
                         print(f"⚠️ No se actualizó el historial para permitir reintento.")
