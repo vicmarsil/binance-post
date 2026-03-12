@@ -9,6 +9,7 @@ from groq import Groq
 import json
 import time
 from datetime import datetime, timedelta, timezone
+import urllib.parse
 
 # --- CONFIGURACIÓN Y VARIABLES DE ENTORNO ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -35,6 +36,10 @@ if "llama3-8b-8192" in GROQ_MODEL_NAME:
     GROQ_MODEL_NAME = "llama-3.3-70b-versatile"
 
 ARCHIVO_HISTORIAL = "historial.json"
+
+# --- LISTA DE MONEDAS A ANALIZAR (MAJORS & ALTA LIQUIDEZ) ---
+MONEDAS_ANALISIS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 
+                    'DOGEUSDT', 'ADAUSDT', 'AVAXUSDT', 'TRXUSDT', 'LINKUSDT']
 
 # Validación básica de seguridad
 if not GROQ_API_KEY:
@@ -66,77 +71,56 @@ def guardar_historial(symbol):
     with open(ARCHIVO_HISTORIAL, "w") as f:
         json.dump(historial, f, indent=4)
 
-def obtener_moneda_tendencia():
+def analizar_oportunidades():
     """
-    1. Monitorizar el mercado:
-    Obtiene la moneda con mayor cambio porcentual positivo (Top Gainer) en las últimas 24h.
+    Analiza la lista MONEDAS_ANALISIS y selecciona la MEJOR oportunidad basada en:
+    1. RSI Extremo (Prioridad): < 30 (Sobreventa) o > 70 (Sobrecompra).
+    2. Alta Volatilidad: Mayor cambio % absoluto si no hay RSI extremo.
     """
-    endpoints = [
-        "https://data-api.binance.vision/api/v3/ticker/24hr",
-        "https://api.binance.com/api/v3/ticker/24hr",
-        "https://api1.binance.com/api/v3/ticker/24hr",
-        "https://api2.binance.com/api/v3/ticker/24hr",
-        "https://api3.binance.com/api/v3/ticker/24hr"
-    ]
+    print(f"🔍 Iniciando escaneo de mercado: {len(MONEDAS_ANALISIS)} activos...")
+    candidatos = []
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-
-    data = None
-    for url in endpoints:
+    for symbol in MONEDAS_ANALISIS:
         try:
-            print(f"📡 Probando conexión con: {url}")
-            response = requests.get(url, headers=headers, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                break
-            else:
-                print(f"⚠️ Falló {url} con código {response.status_code}")
+            # 1. Obtener Datos de Precio 24h
+            url_ticker = "https://api.binance.com/api/v3/ticker/24hr"
+            resp = requests.get(url_ticker, params={'symbol': symbol}, timeout=5)
+            if resp.status_code != 200: continue
+            ticker = resp.json()
+
+            # 2. Calcular RSI 1h
+            rsi, _ = calcular_rsi(symbol)
+            if rsi is None: continue
+
+            candidatos.append({
+                "symbol": symbol.replace("USDT", ""),
+                "lastPrice": float(ticker['lastPrice']),
+                "percent": float(ticker['priceChangePercent']),
+                "rsi": rsi
+            })
+            time.sleep(0.1) # Pausa cortés a la API
         except Exception as e:
-            print(f"❌ Error conectando a {url}: {e}")
+            print(f"⚠️ Error analizando {symbol}: {e}")
             continue
 
-    if not data:
+    if not candidatos:
+        print("❌ No se obtuvieron datos de mercado.")
         return None
 
-    try:
-        
-        # Filtramos solo pares con USDT para asegurar liquidez y relevancia
-        tickers = [t for t in data if t['symbol'].endswith('USDT')]
-        
-        # Ordenamos por mayor subida (descendente)
-        sorted_tickers = sorted(tickers, key=lambda x: float(x['priceChangePercent']), reverse=True)
-        
-        # Cargar historial y filtrar monedas ya publicadas en las últimas 24h
-        historial = cargar_historial()
-        ahora = time.time()
-        candidatos = []
-        
-        for t in sorted_tickers:
-            symbol = t['symbol'].replace('USDT', '')
-            if symbol in historial and (ahora - historial[symbol] < 86400):
-                continue
-            candidatos.append(t)
+    # CRITERIO DE SELECCIÓN
+    # Filtramos RSI extremos (<30 o >70)
+    extremos_rsi = [c for c in candidatos if c['rsi'] <= 30 or c['rsi'] >= 70]
 
-        if not candidatos:
-            print("⚠️ Todas las monedas trending han sido publicadas recientemente.")
-            return None
+    if extremos_rsi:
+        # Si hay extremos, ganan. Ordenamos por qué tan lejos están de 50 (cuanto más lejos, más extremo)
+        ganador = sorted(extremos_rsi, key=lambda x: abs(x['rsi'] - 50), reverse=True)[0]
+        print(f"🏆 Ganador por RSI Extremo: {ganador['symbol']} (RSI: {ganador['rsi']:.1f})")
+    else:
+        # Si no, gana la que tenga mayor movimiento porcentual absoluto (subida o bajada fuerte)
+        ganador = sorted(candidatos, key=lambda x: abs(x['percent']), reverse=True)[0]
+        print(f"🏆 Ganador por Volatilidad: {ganador['symbol']} ({ganador['percent']}%)")
 
-        # Tomamos la primera moneda candidata que no ha sido publicada recientemente.
-        top_ticker = candidatos[0]
-        symbol = top_ticker['symbol'].replace('USDT', '')
-        
-        print(f"ℹ️ Moneda seleccionada: {symbol}. No se buscará logo para agilizar.")
-
-        return {
-            "symbol": symbol,
-            "percent": top_ticker['priceChangePercent'],
-            "lastPrice": top_ticker['lastPrice']
-        }
-    except Exception as e:
-        print(f"⚠️ Error obteniendo datos de Binance: {e}")
-        return None
+    return ganador
 
 def generar_post_inteligente(datos_mercado):
     """
@@ -287,25 +271,9 @@ def calcular_rsi(symbol, period=14):
     except Exception as e:
         return None, None
 
-def verificar_rsi_majors():
-    # Monedas 'Blue Chip' para buscar oportunidades de oro
-    majors = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT']
-    print("🔍 Escaneando oportunidades RSI en Majors (BTC, ETH, BNB, SOL)...")
-    
-    for symbol in majors:
-        rsi, precio = calcular_rsi(symbol)
-        if rsi is not None and rsi < 30: # Nivel de Sobreventa
-            print(f"🚨 ¡ALERTA! {symbol} con RSI {rsi:.2f} (Sobreventa)")
-            return {
-                "symbol": symbol.replace('USDT', ''),
-                "rsi": rsi,
-                "price": precio
-            }
-    return None
-
 def generar_post_rsi(datos):
     moneda = datos['symbol']
-    rsi = int(datos['rsi'])
+    rsi = int(datos['rsi']) if datos['rsi'] else 50
     precio = "{:.2f}".format(datos['price'])
     
     prompt = f"""
@@ -434,19 +402,74 @@ def publicar_en_square(contenido):
         print(f"⚠️ Error técnico: {e}")
         return False
 
+def generar_imagen_ia(symbol, prompt_context="crypto trading chart futuristic style"):
+    """Genera una imagen IA on-the-fly usando Pollinations.ai (Gratis) si no hay logo."""
+    try:
+        # Prompt descriptivo para la IA
+        full_prompt = f"{symbol} coin logo, {prompt_context}, 3d render, 8k resolution, neon lighting"
+        encoded_prompt = urllib.parse.quote(full_prompt)
+        
+        # Generamos URL (Pollinations no requiere API Key)
+        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={int(time.time())}"
+        print(f"🎨 Generando imagen IA para {symbol}...")
+        return url
+    except Exception as e:
+        print(f"⚠️ Error generando imagen IA: {e}")
+        return None
+
+def obtener_imagen_binance(symbol):
+    """Obtiene logo de Binance, GitHub o genera uno con IA."""
+    try:
+        # 1. Intentar API interna de Binance
+        url = "https://www.binance.com/bapi/asset/v2/public/asset-service/product/get-product-by-symbol"
+        params = {"symbol": symbol} # Ej: BTCUSDT
+        resp = requests.get(url, params=params, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json()
+            logo = data.get("data", {}).get("logoUrl")
+            if logo: 
+                return logo
+    except Exception as e:
+        print(f"⚠️ Warning buscando logo Binance: {e}")
+    
+    # 2. Fallback: Iconos genéricos de GitHub (Verificamos existencia)
+    base = symbol.replace("USDT", "").lower()
+    github_url = f"https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/{base}.png"
+    try:
+        check = requests.head(github_url, timeout=3)
+        if check.status_code == 200:
+            return github_url
+    except: pass
+
+    # 3. Último recurso: Generar imagen con IA sobre el tema
+    return generar_imagen_ia(symbol.replace("USDT", ""), "bullish trend rising chart glowing")
+
+def enviar_telegram_multimedia(mensaje, imagen_url):
+    """Envía imagen + texto. Si cabe en caption usa un solo mensaje, si no, envía por separado."""
+    url_photo = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendPhoto"
+    
+    # 1. Intentar Caption (Límite 1024 chars para captions en Telegram)
+    if len(mensaje) < 1000:
+        payload = {"chat_id": ID_TELEGRAM, "photo": imagen_url, "caption": mensaje, "parse_mode": "HTML"}
+        try:
+            r = requests.post(url_photo, json=payload, timeout=10)
+            if r.status_code == 200: return
+        except: pass
+    
+    # 2. Si falla o es largo: Foto sola + Texto separado
+    try:
+        requests.post(url_photo, json={"chat_id": ID_TELEGRAM, "photo": imagen_url}, timeout=10)
+    except: pass
+    enviar_telegram(mensaje)
+
 def enviar_telegram(mensaje):
     """
     Envía el mensaje formateado a Telegram. Divide mensajes largos si es necesario.
     """
-    # --- FILTRO HORARIO ARGENTINA (06:30 - 23:00) ---
-    utc_now = datetime.now(timezone.utc)
-    ar_time = utc_now - timedelta(hours=3)
-    start_time = ar_time.replace(hour=6, minute=30, second=0, microsecond=0)
-    end_time = ar_time.replace(hour=23, minute=0, second=0, microsecond=0)
-
-    if not (start_time <= ar_time <= end_time):
-        print(f"🌙 Horario de silencio en Telegram ({ar_time.strftime('%H:%M')} AR). Mensaje omitido.")
-        return
+    # --- FILTRO HORARIO DESACTIVADO PARA ESTA ESTRATEGIA ---
+    # Al usar cronjobs específicos (09:30 y 22:00 UTC), controlamos la hora desde GitHub.
+    # El código de silencio anterior podría bloquear el reporte de las 06:30 AM exactas.
+    pass
     # ------------------------------------------------
 
     if not TOKEN_TELEGRAM or not ID_TELEGRAM:
@@ -516,87 +539,54 @@ if __name__ == "__main__":
                 # Nota: No guardamos historial para F&G porque es un post diario único.
     
     else:
-        # --- MODO TENDENCIA (Por defecto) ---
+        # --- MODO REPORTE DIARIO (Matutino/Vespertino) ---
         
-        # 1. Primero buscamos oportunidades VIP (RSI < 30 en Majors)
-        # Esto tiene prioridad sobre las monedas random que suben.
-        alerta_rsi = verificar_rsi_majors()
+        # 1. Determinar Saludo según Horario UTC
+        hora_actual = datetime.now(timezone.utc).hour
+        saludo_telegram = "🤖 Reporte vIcmAr"
         
-        if alerta_rsi:
-            post_rsi = generar_post_rsi(alerta_rsi)
-            if post_rsi and publicar_en_square(post_rsi):
-                # Guardamos con sufijo _RSI para no repetir la alerta en 24h
-                guardar_historial(f"{alerta_rsi['symbol']}_RSI")
-                print(f"💾 Alerta RSI de {alerta_rsi['symbol']} guardada.")
+        # 09:30 UTC es mañana AR / 22:00 UTC es noche AR
+        if 8 <= hora_actual <= 11:
+            saludo_telegram = "🌅 Reporte Matutino vIcmAr"
+        elif 20 <= hora_actual <= 23:
+            saludo_telegram = "🌆 Reporte Vespertino vIcmAr"
+            
+        # 2. Obtener la Mejor Oportunidad de la Sesión
+        oportunidad = analizar_oportunidades()
+        
+        if oportunidad:
+            # Adaptamos datos para consistencia (lastPrice -> price en funciones viejas)
+            oportunidad['price'] = oportunidad['lastPrice'] 
+            
+            # Generamos Post Corto para Square (usamos la lógica inteligente general o RSI si es extremo)
+            if oportunidad['rsi'] <= 30 or oportunidad['rsi'] >= 70:
+                post_square = generar_post_rsi(oportunidad)
+            else:
+                post_square = generar_post_inteligente(oportunidad)
+            
+            # Publicar en Square
+            if post_square and publicar_en_square(post_square):
+                print(f"✅ Publicado en Square. Procediendo a Blog/Telegram...")
+                guardar_historial(oportunidad['symbol']) # Opcional: Para evitar repetir si fallara algo externo
                 
-                msg = f"<b>🚨 ALERTA RSI EXTREMO 🚨</b>\n" \
-                      f"--------------------------\n" \
-                      f"💎 <b>Moneda:</b> {alerta_rsi['symbol']}\n" \
-                      f"💰 <b>Precio:</b> {alerta_rsi['price']} USDT\n" \
-                      f"📉 <b>RSI (1h):</b> {alerta_rsi['rsi']:.2f}\n" \
-                      f"--------------------------\n" \
-                      f"🤖 <b>vIcmAr Insight:</b> Zona de sobreventa detectada.\n" \
-                      f"--------------------------\n" \
-                      f"🔗 <a href='https://www.binance.com/es-LA/square/profile/victormarsilli'>Ver Perfil Binance Square</a>"
-                enviar_telegram(msg)
+                # Generar Artículo Blog Extenso
+                articulo_blog = generar_articulo_blog(oportunidad)
+                img_url = obtener_imagen_binance(oportunidad['symbol'])
                 
-                # Generar y enviar artículo de blog
-                articulo = generar_articulo_blog(alerta_rsi)
-                if articulo:
-                    articulo = articulo.strip()
-                    # Separar título y contenido
-                    lineas = articulo.split('\n')
+                if articulo_blog:
+                    articulo_blog = articulo_blog.strip()
+                    lineas = articulo_blog.split('\n')
                     titulo_blog = lineas[0].replace('#', '').strip()
                     contenido_blog = "\n".join(lineas[1:]).strip()
-                    firma = "\n\nOriginally published on my Binance Square profile: https://www.binance.com/es-LA/square/profile/victormarsilli"
                     
-                    # Mensajes telegram para copiado fácil
-                    enviar_telegram(f"{titulo_blog}")
-                    enviar_telegram(f"{contenido_blog + firma}")
-        
-        else:
-            # 2. Si no hay alertas VIP, buscamos tendencia normal (Top Gainers)
-            tendencia = obtener_moneda_tendencia()
-            if tendencia:
-                print(f"📈 Tendencia detectada: {tendencia['symbol']} ({tendencia['percent']}%)")
-                post_final = generar_post_inteligente(tendencia)
-                if post_final:
-                    if publicar_en_square(post_final):
-                        guardar_historial(tendencia['symbol'])
-                        print(f"💾 Guardado {tendencia['symbol']} en el historial.")
-                        
-                        # Calculamos RSI rápido para el reporte de Telegram
-                        rsi_val, _ = calcular_rsi(tendencia['symbol'])
-                        rsi_txt = f"{rsi_val:.2f}" if rsi_val else "N/A"
-                        
-                        msg = f"<b>🚀 TENDENCIA DETECTADA 🚀</b>\n" \
-                              f"--------------------------\n" \
-                              f"🔥 <b>Moneda:</b> {tendencia['symbol']}\n" \
-                              f"📈 <b>Cambio 24h:</b> +{tendencia['percent']}%\n" \
-                              f"💰 <b>Precio:</b> {tendencia['lastPrice']} USDT\n" \
-                              f"📊 <b>RSI (1h):</b> {rsi_txt}\n" \
-                              f"--------------------------\n" \
-                              f"🤖 <b>vIcmAr Insight:</b> Tendencia detectada por volumen atípico.\n" \
-                              f"--------------------------\n" \
-                              f"🔗 <a href='https://www.binance.com/es-LA/square/profile/victormarsilli'>Ver Perfil Binance Square</a>"
-                        enviar_telegram(msg)
-                        
-                        # Preparamos datos completos para el blog
-                        datos_blog = tendencia.copy()
-                        datos_blog['rsi'] = rsi_txt
-                        
-                        # Generar y enviar artículo de blog
-                        articulo = generar_articulo_blog(datos_blog)
-                        if articulo:
-                            articulo = articulo.strip()
-                            # Separar título y contenido
-                            lineas = articulo.split('\n')
-                            titulo_blog = lineas[0].replace('#', '').strip()
-                            contenido_blog = "\n".join(lineas[1:]).strip()
-                            firma = "\n\nOriginally published on my Binance Square profile: https://www.binance.com/es-LA/square/profile/victormarsilli"
-                            
-                            # Mensajes telegram para copiado fácil
-                            enviar_telegram(f"{titulo_blog}")
-                            enviar_telegram(f"{contenido_blog + firma}")
-                    else:
-                        print(f"⚠️ No se actualizó el historial para permitir reintento.")
+                    mensaje_final = (
+                        f"📌 <b>{titulo_blog}</b>\n"
+                        f"------------------------------\n"
+                        f"📝 <b>ARTICLE:</b>\n{contenido_blog}\n"
+                        f"------------------------------\n"
+                        f"🔗 <a href='https://www.binance.com/es-LA/square/profile/victormarsilli'>Source: Binance Square</a>"
+                    )
+                    
+                    enviar_telegram_multimedia(mensaje_final, img_url)
+                else:
+                    enviar_telegram("⚠️ No se pudo generar el artículo de blog, pero el post de Square está activo.")
