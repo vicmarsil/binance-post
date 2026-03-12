@@ -444,8 +444,12 @@ def enviar_telegram(mensaje):
             print("✅ Telegram enviado correctamente.")
         else:
             print(f"⚠️ Error Telegram {response.status_code}: {response.text}")
-            # Si falla por formato Markdown (muy común con IA), reintentamos sin formato
-            if response.status_code == 400:
+            
+            if "chat not found" in response.text:
+                print("💡 AYUDA: El bot no tiene permiso para escribirte. Envíale /start en Telegram o verifica tu ID_TELEGRAM.")
+            # Si falla por formato Markdown (muy común con IA), reintentamos sin formato.
+            # Usamos 'elif' para no reintentar si el chat no existe (sería inútil).
+            elif response.status_code == 400:
                 print("🔄 Reintentando envío sin formato Markdown (texto plano)...")
                 payload.pop("parse_mode", None)
                 requests.post(url, json=payload, timeout=10)
