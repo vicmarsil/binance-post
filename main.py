@@ -18,6 +18,10 @@ MODO_PRUEBA = os.getenv("MODO_PRUEBA", "False").lower() == "true" # 🟢 Configu
 GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama-3.3-70b-versatile").strip() # .strip() elimina espacios fantasma
 TIPO_BOT = os.getenv("TIPO_BOT", "TENDENCIA") # 🟢 Nuevo: Selecciona el modo de operación
 
+# Credenciales para Telegram
+TOKEN_TELEGRAM = os.getenv("token_telegram")
+ID_TELEGRAM = os.getenv("id_telegram")
+
 # 🛡️ Parche de seguridad: Si el entorno (.env local) tiene el modelo viejo, forzamos el nuevo.
 # Usamos 'in' para detectar variantes con espacios o comillas
 if "llama3-8b-8192" in GROQ_MODEL_NAME:
@@ -328,6 +332,50 @@ def generar_post_rsi(datos):
         print(f"⚠️ Error generando texto RSI: {e}")
         return None
 
+def generar_articulo_blog(datos):
+    """
+    Genera un artículo educativo y técnico extenso (>500 palabras)
+    con estilo 'Diario de un Programador Cripto'.
+    """
+    symbol = datos.get('symbol')
+    precio = datos.get('price', datos.get('lastPrice'))
+    rsi = datos.get('rsi', 'N/A')
+    cambio = datos.get('percent', 'N/A')
+    
+    prompt = f"""
+    Actúa como vIcmAr, un bot de trading programado en Python que opera desde servidores en la nube pero con "alma argentina".
+    
+    TAREA: Escribir un artículo de blog técnico y educativo en Markdown para Publish0x.
+    TEMA: Análisis técnico profundo de {symbol}.
+    DATOS: Precio: {precio} USDT. RSI: {rsi}. Cambio 24h: {cambio}%.
+    
+    ESTILO DE REDACCIÓN (IMPORTANTE):
+    - Tono: "Diario de un Programador". Usa primera persona.
+    - Frases OBLIGATORIAS: "Desde mi terminal en Argentina...", "Analizando los logs de mi script...", "El algoritmo detectó...".
+    - Enfoque: Técnico pero explicativo. Enseña qué es el RSI o el volumen mientras analizas.
+    - NO uses frases genéricas de IA como "En el mundo digital de hoy". Sé crudo, directo y 'geek'.
+    - Generá el artículo de blog exclusivamente en inglés, usando un lenguaje técnico avanzado, pero mantené las alertas de Telegram en español.
+    
+    ESTRUCTURA MARKDOWN:
+    1. # Título H1 (Llamativo y técnico)
+    2. ## 📟 El hallazgo en la consola (Intro personal)
+    3. ## ⚙️ Análisis de los datos (Desglose de precio y RSI)
+    4. ## 🔮 Proyección del código (Conclusión)
+    5. Longitud: Mínimo 500 palabras.
+    """
+    
+    try:
+        print(f"✍️ Redactando artículo de blog para {symbol}...")
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model=GROQ_MODEL_NAME,
+            temperature=0.7
+        )
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        print(f"⚠️ Error generando artículo blog: {e}")
+        return None
+
 def publicar_en_square(contenido):
     """
     3. Publicación Automática:
@@ -375,6 +423,26 @@ def publicar_en_square(contenido):
         print(f"⚠️ Error técnico: {e}")
         return False
 
+def enviar_telegram(mensaje):
+    """
+    Envía el mensaje formateado a Telegram. No detiene el bot si falla.
+    """
+    if not TOKEN_TELEGRAM or not ID_TELEGRAM:
+        print("⚠️ Telegram: Credenciales no configuradas. Se omite el envío.")
+        return
+
+    url = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendMessage"
+    payload = {
+        "chat_id": ID_TELEGRAM,
+        "text": mensaje,
+        "parse_mode": "Markdown",
+        "disable_web_page_preview": True
+    }
+    try:
+        requests.post(url, json=payload, timeout=5)
+    except Exception as e:
+        print(f"⚠️ Error enviando a Telegram: {e}")
+
 if __name__ == "__main__":
     print("🤖 Iniciando Bot vIcmAr...")
     print(f"⚙️ Versión 2.1 - Modelo: {GROQ_MODEL_NAME} | Modo: {TIPO_BOT}")
@@ -402,6 +470,18 @@ if __name__ == "__main__":
                 # Guardamos con sufijo _RSI para no repetir la alerta en 24h
                 guardar_historial(f"{alerta_rsi['symbol']}_RSI")
                 print(f"💾 Alerta RSI de {alerta_rsi['symbol']} guardada.")
+                
+                msg = f"🚨 *ALERTA RSI DETECTADA* 🚨\n\n" \
+                      f"🪙 *Moneda:* {alerta_rsi['symbol']}\n" \
+                      f"📉 *RSI:* {alerta_rsi['rsi']:.2f}\n" \
+                      f"💵 *Precio:* {alerta_rsi['price']}\n\n" \
+                      f"🔗 [Ver en Binance Square](https://www.binance.com/es-LA/square/profile/victormarsilli)"
+                enviar_telegram(msg)
+                
+                # Generar y enviar artículo de blog
+                articulo = generar_articulo_blog(alerta_rsi)
+                if articulo:
+                    enviar_telegram(f"📝 *BORRADOR DE ARTÍCULO BLOG:*\n\n{articulo}")
         
         else:
             # 2. Si no hay alertas VIP, buscamos tendencia normal (Top Gainers)
@@ -413,5 +493,26 @@ if __name__ == "__main__":
                     if publicar_en_square(post_final):
                         guardar_historial(tendencia['symbol'])
                         print(f"💾 Guardado {tendencia['symbol']} en el historial.")
+                        
+                        # Calculamos RSI rápido para el reporte de Telegram
+                        rsi_val, _ = calcular_rsi(tendencia['symbol'])
+                        rsi_txt = f"{rsi_val:.2f}" if rsi_val else "N/A"
+                        
+                        msg = f"🚀 *OPORTUNIDAD DE TENDENCIA* 🚀\n\n" \
+                              f"🪙 *Moneda:* {tendencia['symbol']}\n" \
+                              f"📈 *Cambio 24h:* {tendencia['percent']}%\n" \
+                              f"📉 *RSI (1h):* {rsi_txt}\n" \
+                              f"💵 *Precio:* {tendencia['lastPrice']}\n\n" \
+                              f"🔗 [Ver en Binance Square](https://www.binance.com/es-LA/square/profile/victormarsilli)"
+                        enviar_telegram(msg)
+                        
+                        # Preparamos datos completos para el blog
+                        datos_blog = tendencia.copy()
+                        datos_blog['rsi'] = rsi_txt
+                        
+                        # Generar y enviar artículo de blog
+                        articulo = generar_articulo_blog(datos_blog)
+                        if articulo:
+                            enviar_telegram(f"📝 *BORRADOR DE ARTÍCULO BLOG:*\n\n{articulo}")
                     else:
                         print(f"⚠️ No se actualizó el historial para permitir reintento.")
