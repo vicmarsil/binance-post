@@ -9,17 +9,6 @@ from groq import Groq
 import json
 import time
 
-# --- SELENIUM & AUTOMATIZACIÓN ---
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
-
 # --- CONFIGURACIÓN Y VARIABLES DE ENTORNO ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 SQUARE_API_KEY = os.getenv("SQUARE_API_KEY")
@@ -32,10 +21,6 @@ TIPO_BOT = os.getenv("TIPO_BOT", "TENDENCIA") # 🟢 Nuevo: Selecciona el modo d
 # Credenciales para Telegram
 TOKEN_TELEGRAM = os.getenv("TOKEN_TELEGRAM")
 ID_TELEGRAM = os.getenv("ID_TELEGRAM")
-
-# Credenciales Publish0x
-P0X_EMAIL = os.getenv("P0X_EMAIL")
-P0X_PASSWORD = os.getenv("P0X_PASSWORD")
 
 # Validación rápida de configuración de Telegram
 if ID_TELEGRAM and not ID_TELEGRAM.lstrip('-').isdigit():
@@ -399,157 +384,6 @@ def generar_articulo_blog(datos):
         print(f"⚠️ Error generando artículo blog: {e}")
         return None
 
-def publicar_en_publish0x(titulo, contenido, tags):
-    """
-    Automatización con Selenium para publicar en Publish0x
-    """
-    if MODO_PRUEBA:
-        print(f"🧪 [MODO PRUEBA] Saltando publicación en Publish0x.")
-        return True
-        
-    if not P0X_EMAIL or not P0X_PASSWORD:
-        print("⚠️ Publish0x: Credenciales P0X_EMAIL o P0X_PASSWORD no configuradas.")
-        return False
-
-    print("🚀 Iniciando navegador Selenium (Headless) para Publish0x...")
-    
-    # Configuración para correr en GitHub Actions (Headless = Invisible)
-    chrome_options = Options()
-    chrome_options.add_argument("--headless") 
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--window-size=1920,1080") # Tamaño estándar para asegurar visibilidad de elementos
-    # Simular un usuario real para evitar bloqueos
-    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-
-    try:
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        
-        # 1. Login
-        print("🔑 Iniciando sesión en Publish0x...")
-        driver.get("https://www.publish0x.com/login")
-        
-        try:
-            # Espera inteligente: hasta 20 segundos. Selector robusto por tipo de input.
-            wait = WebDriverWait(driver, 20)
-            password_input = None
-            
-            try:
-                email_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='email']")))
-                email_input.click()
-                email_input.send_keys(P0X_EMAIL)
-                password_input = driver.find_element(By.NAME, "password")
-                password_input.send_keys(P0X_PASSWORD)
-            except StaleElementReferenceException:
-                print("⚠️ StaleElementReferenceException: Reintentando login tras recarga del DOM...")
-                time.sleep(2)
-                email_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='email']")))
-                email_input.click()
-                email_input.send_keys(P0X_EMAIL)
-                password_input = driver.find_element(By.NAME, "password")
-                password_input.send_keys(P0X_PASSWORD)
-
-            # Estrategia "Todo terreno" para el botón de Login
-            login_success = False
-            selectors = [
-                (By.CSS_SELECTOR, "button[type='submit']"),
-                (By.XPATH, "//button[contains(text(), 'Login')]"),
-                (By.XPATH, "//button[contains(text(), 'Sign In')]"),
-                (By.CSS_SELECTOR, ".btn-primary"),
-                (By.CSS_SELECTOR, ".btn-login")
-            ]
-            
-            for by_type, selector in selectors:
-                try:
-                    btn = driver.find_element(by_type, selector)
-                    driver.execute_script("arguments[0].scrollIntoView();", btn)
-                    time.sleep(1) # Pausa técnica post-scroll
-                    btn.click()
-                    print(f"🖱️ Click exitoso en botón Login usando: {selector}")
-                    login_success = True
-                    break
-                except Exception:
-                    continue
-            
-            # Fallback: Si ningún botón funcionó, usamos ENTER en el campo password
-            if not login_success and password_input:
-                print("⚠️ Botón esquivo. Usando tecla ENTER en campo password como alternativa.")
-                password_input.send_keys(Keys.ENTER)
-            
-            time.sleep(5)
-        except TimeoutException:
-            print("❌ Error: El formulario de login de Publish0x no cargó a tiempo. Puede ser por un CAPTCHA o cambio en la página.")
-            driver.quit()
-            return False
-        
-        time.sleep(5) # Esperar redirección al Dashboard
-        if "login" in driver.current_url:
-            print("❌ Error: Parece que seguimos en la página de login. Verifica credenciales o Captchas.")
-            driver.quit()
-            return False
-            
-        # 2. Ir a Nuevo Post
-        print("📝 Navegando a 'New Post'...")
-        driver.get("https://www.publish0x.com/new-post")
-        time.sleep(5)
-        
-        # 3. Llenar Datos
-        print(f"✍️ Escribiendo título: {titulo}")
-        driver.find_element(By.NAME, "title").send_keys(titulo)
-        
-        print("✍️ Pegando contenido en el editor...")
-        
-        # Agregar Footer de Copyright requerido
-        contenido += "\n\nOriginally published on my Binance Square profile: https://www.binance.com/es-LA/square/profile/victormarsilli"
-
-        # Publish0x usa editores complejos. La forma más segura en automación headless 
-        # sin interactuar con iframes complejos es intentar enviar al elemento activo o textarea.
-        # Estrategia: Tabular desde el título o buscar el input de tags y volver atrás.
-        # Aquí usaremos JS para inyectar si es posible, o send_keys al body si el foco está bien.
-        # Intento genérico:
-        driver.execute_script("window.scrollTo(0, 200)")
-        try:
-            # Intentamos encontrar el área editable (varía según editor, ej: CKEditor, TinyMCE)
-            # Opción A: Enviar keys al elemento activo después del título (Tab)
-            webdriver.ActionChains(driver).send_keys(webdriver.Keys.TAB).send_keys(contenido).perform()
-        except Exception as e:
-            print(f"⚠️ Fallo escritura directa, intentando método alternativo: {e}")
-
-        # 4. Tags y Publicar
-        print(f"🏷️ Seleccionando tags: {tags}")
-        try:
-            # Intentamos encontrar el botón de Publish para asegurarnos que la página cargó completa
-            publish_btn = driver.find_element(By.XPATH, "//button[contains(text(), 'Publish')]")
-            
-            # Hacemos scroll y click en Publicar
-            driver.execute_script("arguments[0].scrollIntoView();", publish_btn)
-            time.sleep(2)
-            print("🚀 Haciendo clic en 'Publish Now'...")
-            publish_btn.click()
-            time.sleep(5)
-            
-            # Notificación de éxito
-            enviar_telegram('✅ Artículo publicado con éxito en Publish0x')
-        except Exception as e:
-            print(f"⚠️ Error en paso final (Tags/Publish): {e}")
-        
-        print("✅ Proceso de Selenium finalizado correctamente (Borrador creado).")
-        driver.quit()
-        return True
-
-    except Exception as e:
-        print(f"❌ Error crítico en Selenium: {e}")
-        if 'driver' in locals():
-            try:
-                driver.save_screenshot("error.png")
-                print("📸 Captura de pantalla guardada en 'error.png' para depuración.")
-            except Exception as s_e:
-                print(f"⚠️ No se pudo guardar captura: {s_e}")
-            driver.quit()
-        return False
-
 def publicar_en_square(contenido):
     """
     3. Publicación Automática:
@@ -672,14 +506,15 @@ if __name__ == "__main__":
                 # Generar y enviar artículo de blog
                 articulo = generar_articulo_blog(alerta_rsi)
                 if articulo:
-                    enviar_telegram(f"📝 *BORRADOR DE ARTÍCULO BLOG:*\n\n{articulo}")
-                    
-                    # Extraer título (Primera línea markdown # Título) y contenido
+                    # Separar título y contenido
                     lineas = articulo.split('\n')
                     titulo_blog = lineas[0].replace('#', '').strip()
-                    contenido_blog = "\n".join(lineas[1:])
+                    contenido_blog = "\n".join(lineas[1:]).strip()
+                    firma = "\n\nOriginally published on my Binance Square profile: https://www.binance.com/es-LA/square/profile/victormarsilli"
                     
-                    publicar_en_publish0x(titulo_blog, contenido_blog, ["Crypto", "Trading", alerta_rsi['symbol']])
+                    # Mensajes telegram para copiado fácil
+                    enviar_telegram(f"📝 *BLOG TITLE:*\n{titulo_blog}")
+                    enviar_telegram(f"📄 *BLOG CONTENT (Ready to Paste):*\n\n{contenido_blog + firma}")
         
         else:
             # 2. Si no hay alertas VIP, buscamos tendencia normal (Top Gainers)
@@ -715,13 +550,14 @@ if __name__ == "__main__":
                         # Generar y enviar artículo de blog
                         articulo = generar_articulo_blog(datos_blog)
                         if articulo:
-                            enviar_telegram(f"📝 *BORRADOR DE ARTÍCULO BLOG:*\n\n{articulo}")
-                            
-                            # Extraer título y publicar
+                            # Separar título y contenido
                             lineas = articulo.split('\n')
                             titulo_blog = lineas[0].replace('#', '').strip()
-                            contenido_blog = "\n".join(lineas[1:])
+                            contenido_blog = "\n".join(lineas[1:]).strip()
+                            firma = "\n\nOriginally published on my Binance Square profile: https://www.binance.com/es-LA/square/profile/victormarsilli"
                             
-                            publicar_en_publish0x(titulo_blog, contenido_blog, ["Crypto", "Trading", tendencia['symbol']])
+                            # Mensajes telegram para copiado fácil
+                            enviar_telegram(f"📝 *BLOG TITLE:*\n{titulo_blog}")
+                            enviar_telegram(f"📄 *BLOG CONTENT (Ready to Paste):*\n\n{contenido_blog + firma}")
                     else:
                         print(f"⚠️ No se actualizó el historial para permitir reintento.")
