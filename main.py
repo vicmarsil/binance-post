@@ -15,6 +15,9 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 
 # --- CONFIGURACIÓN Y VARIABLES DE ENTORNO ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -416,6 +419,8 @@ def publicar_en_publish0x(titulo, contenido, tags):
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--window-size=1920,1080") # Tamaño estándar para asegurar visibilidad de elementos
+    # Simular un usuario real para evitar bloqueos
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
     try:
         service = Service(ChromeDriverManager().install())
@@ -424,12 +429,19 @@ def publicar_en_publish0x(titulo, contenido, tags):
         # 1. Login
         print("🔑 Iniciando sesión en Publish0x...")
         driver.get("https://www.publish0x.com/login")
-        time.sleep(3) # Espera carga
         
-        driver.find_element(By.NAME, "email").send_keys(P0X_EMAIL)
-        driver.find_element(By.NAME, "password").send_keys(P0X_PASSWORD)
-        # Buscamos el botón de submit (puede variar, usamos selector genérico seguro)
-        driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+        try:
+            # Espera inteligente: hasta 20 segundos. Selector robusto por tipo de input.
+            wait = WebDriverWait(driver, 20)
+            email_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='email']")))
+            
+            email_input.send_keys(P0X_EMAIL)
+            driver.find_element(By.NAME, "password").send_keys(P0X_PASSWORD)
+            driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+        except TimeoutException:
+            print("❌ Error: El formulario de login de Publish0x no cargó a tiempo. Puede ser por un CAPTCHA o cambio en la página.")
+            driver.quit()
+            return False
         
         time.sleep(5) # Esperar redirección al Dashboard
         if "login" in driver.current_url:
@@ -489,6 +501,11 @@ def publicar_en_publish0x(titulo, contenido, tags):
     except Exception as e:
         print(f"❌ Error crítico en Selenium: {e}")
         if 'driver' in locals():
+            try:
+                driver.save_screenshot("error.png")
+                print("📸 Captura de pantalla guardada en 'error.png' para depuración.")
+            except Exception as s_e:
+                print(f"⚠️ No se pudo guardar captura: {s_e}")
             driver.quit()
         return False
 
