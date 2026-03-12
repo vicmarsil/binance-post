@@ -8,6 +8,7 @@ import requests
 from groq import Groq
 import json
 import time
+from datetime import datetime, timedelta, timezone
 
 # --- CONFIGURACIÓN Y VARIABLES DE ENTORNO ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -368,7 +369,7 @@ def generar_articulo_blog(datos):
     3. ## 📟 Console Discovery (Contexto)
     4. ## ⚙️ Data Analysis (Desglose de precio y RSI)
     5. ## 🔮 Code Projection (Conclusión)
-    6. **TAGS**: Al final, incluye obligatoriamente: #Crypto #Python #Trading #{symbol}
+    6. **TAGS**: Al final, genera una lista de 5 tags recomendados (ej: #Crypto #Trading #AI #RSI #{symbol}).
     
     Longitud: Mínimo 500 palabras.
     """
@@ -436,6 +437,17 @@ def enviar_telegram(mensaje):
     """
     Envía el mensaje formateado a Telegram. Divide mensajes largos si es necesario.
     """
+    # --- FILTRO HORARIO ARGENTINA (06:30 - 23:00) ---
+    utc_now = datetime.now(timezone.utc)
+    ar_time = utc_now - timedelta(hours=3)
+    start_time = ar_time.replace(hour=6, minute=30, second=0, microsecond=0)
+    end_time = ar_time.replace(hour=23, minute=0, second=0, microsecond=0)
+
+    if not (start_time <= ar_time <= end_time):
+        print(f"🌙 Horario de silencio en Telegram ({ar_time.strftime('%H:%M')} AR). Mensaje omitido.")
+        return
+    # ------------------------------------------------
+
     if not TOKEN_TELEGRAM or not ID_TELEGRAM:
         print("⚠️ Telegram: Credenciales no configuradas. Se omite el envío.")
         return
