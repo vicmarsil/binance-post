@@ -14,6 +14,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -433,21 +434,50 @@ def publicar_en_publish0x(titulo, contenido, tags):
         try:
             # Espera inteligente: hasta 20 segundos. Selector robusto por tipo de input.
             wait = WebDriverWait(driver, 20)
+            password_input = None
             
             try:
                 email_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='email']")))
                 email_input.click()
                 email_input.send_keys(P0X_EMAIL)
-                driver.find_element(By.NAME, "password").send_keys(P0X_PASSWORD)
+                password_input = driver.find_element(By.NAME, "password")
+                password_input.send_keys(P0X_PASSWORD)
             except StaleElementReferenceException:
                 print("⚠️ StaleElementReferenceException: Reintentando login tras recarga del DOM...")
                 time.sleep(2)
                 email_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='email']")))
                 email_input.click()
                 email_input.send_keys(P0X_EMAIL)
-                driver.find_element(By.NAME, "password").send_keys(P0X_PASSWORD)
+                password_input = driver.find_element(By.NAME, "password")
+                password_input.send_keys(P0X_PASSWORD)
 
-            driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+            # Estrategia "Todo terreno" para el botón de Login
+            login_success = False
+            selectors = [
+                (By.CSS_SELECTOR, "button[type='submit']"),
+                (By.XPATH, "//button[contains(text(), 'Login')]"),
+                (By.XPATH, "//button[contains(text(), 'Sign In')]"),
+                (By.CSS_SELECTOR, ".btn-primary"),
+                (By.CSS_SELECTOR, ".btn-login")
+            ]
+            
+            for by_type, selector in selectors:
+                try:
+                    btn = driver.find_element(by_type, selector)
+                    driver.execute_script("arguments[0].scrollIntoView();", btn)
+                    time.sleep(1) # Pausa técnica post-scroll
+                    btn.click()
+                    print(f"🖱️ Click exitoso en botón Login usando: {selector}")
+                    login_success = True
+                    break
+                except Exception:
+                    continue
+            
+            # Fallback: Si ningún botón funcionó, usamos ENTER en el campo password
+            if not login_success and password_input:
+                print("⚠️ Botón esquivo. Usando tecla ENTER en campo password como alternativa.")
+                password_input.send_keys(Keys.ENTER)
+            
             time.sleep(5)
         except TimeoutException:
             print("❌ Error: El formulario de login de Publish0x no cargó a tiempo. Puede ser por un CAPTCHA o cambio en la página.")
