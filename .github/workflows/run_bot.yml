@@ -27,7 +27,7 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install requests groq python-dotenv
+          pip install requests groq python-dotenv selenium webdriver-manager
 
       - name: Ejecutar Bot
         env:
@@ -37,6 +37,8 @@ jobs:
           GROQ_MODEL_NAME: "llama-3.3-70b-versatile" # 👈 Modelo de Groq a usar. Cambiar aquí si es deprecado.
           TOKEN_TELEGRAM: ${{ secrets.TOKEN_TELEGRAM }}
           ID_TELEGRAM: ${{ secrets.ID_TELEGRAM }}
+          P0X_EMAIL: ${{ secrets.P0X_EMAIL }}
+          P0X_PASSWORD: ${{ secrets.P0X_PASSWORD }}
         run: python main.py
 
       - name: Guardar base de datos (historial)

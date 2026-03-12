@@ -9,6 +9,13 @@ from groq import Groq
 import json
 import time
 
+# --- SELENIUM & AUTOMATIZACIÓN ---
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
+
 # --- CONFIGURACIÓN Y VARIABLES DE ENTORNO ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 SQUARE_API_KEY = os.getenv("SQUARE_API_KEY")
@@ -21,6 +28,10 @@ TIPO_BOT = os.getenv("TIPO_BOT", "TENDENCIA") # 🟢 Nuevo: Selecciona el modo d
 # Credenciales para Telegram
 TOKEN_TELEGRAM = os.getenv("TOKEN_TELEGRAM")
 ID_TELEGRAM = os.getenv("ID_TELEGRAM")
+
+# Credenciales Publish0x
+P0X_EMAIL = os.getenv("P0X_EMAIL")
+P0X_PASSWORD = os.getenv("P0X_PASSWORD")
 
 # Validación rápida de configuración de Telegram
 if ID_TELEGRAM and not ID_TELEGRAM.lstrip('-').isdigit():
@@ -363,10 +374,13 @@ def generar_articulo_blog(datos):
     
     ESTRUCTURA MARKDOWN:
     1. # Título H1 (Llamativo y técnico)
-    2. ## 📟 El hallazgo en la consola (Intro personal)
-    3. ## ⚙️ Análisis de los datos (Desglose de precio y RSI)
-    4. ## 🔮 Proyección del código (Conclusión)
-    5. Longitud: Mínimo 500 palabras.
+    2. **INTRODUCCIÓN**: El primer párrafo debe presentar brevemente el proyecto de automatización vIcmAr.
+    3. ## 📟 El hallazgo en la consola (Contexto)
+    4. ## ⚙️ Análisis de los datos (Desglose de precio y RSI)
+    5. ## 🔮 Proyección del código (Conclusión)
+    6. **TAGS**: Al final, incluye obligatoriamente: #Crypto #Python #Trading #{symbol}
+    
+    Longitud: Mínimo 500 palabras.
     """
     
     try:
@@ -380,6 +394,103 @@ def generar_articulo_blog(datos):
     except Exception as e:
         print(f"⚠️ Error generando artículo blog: {e}")
         return None
+
+def publicar_en_publish0x(titulo, contenido, tags):
+    """
+    Automatización con Selenium para publicar en Publish0x
+    """
+    if MODO_PRUEBA:
+        print(f"🧪 [MODO PRUEBA] Saltando publicación en Publish0x.")
+        return True
+        
+    if not P0X_EMAIL or not P0X_PASSWORD:
+        print("⚠️ Publish0x: Credenciales P0X_EMAIL o P0X_PASSWORD no configuradas.")
+        return False
+
+    print("🚀 Iniciando navegador Selenium (Headless) para Publish0x...")
+    
+    # Configuración para correr en GitHub Actions (Headless = Invisible)
+    chrome_options = Options()
+    chrome_options.add_argument("--headless") 
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--window-size=1920,1080") # Tamaño estándar para asegurar visibilidad de elementos
+
+    try:
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        # 1. Login
+        print("🔑 Iniciando sesión en Publish0x...")
+        driver.get("https://www.publish0x.com/login")
+        time.sleep(3) # Espera carga
+        
+        driver.find_element(By.NAME, "email").send_keys(P0X_EMAIL)
+        driver.find_element(By.NAME, "password").send_keys(P0X_PASSWORD)
+        # Buscamos el botón de submit (puede variar, usamos selector genérico seguro)
+        driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+        
+        time.sleep(5) # Esperar redirección al Dashboard
+        if "login" in driver.current_url:
+            print("❌ Error: Parece que seguimos en la página de login. Verifica credenciales o Captchas.")
+            driver.quit()
+            return False
+            
+        # 2. Ir a Nuevo Post
+        print("📝 Navegando a 'New Post'...")
+        driver.get("https://www.publish0x.com/new-post")
+        time.sleep(5)
+        
+        # 3. Llenar Datos
+        print(f"✍️ Escribiendo título: {titulo}")
+        driver.find_element(By.NAME, "title").send_keys(titulo)
+        
+        print("✍️ Pegando contenido en el editor...")
+        
+        # Agregar Footer de Copyright requerido
+        contenido += "\n\nOriginally published on my Binance Square profile: https://www.binance.com/es-LA/square/profile/victormarsilli"
+
+        # Publish0x usa editores complejos. La forma más segura en automación headless 
+        # sin interactuar con iframes complejos es intentar enviar al elemento activo o textarea.
+        # Estrategia: Tabular desde el título o buscar el input de tags y volver atrás.
+        # Aquí usaremos JS para inyectar si es posible, o send_keys al body si el foco está bien.
+        # Intento genérico:
+        driver.execute_script("window.scrollTo(0, 200)")
+        try:
+            # Intentamos encontrar el área editable (varía según editor, ej: CKEditor, TinyMCE)
+            # Opción A: Enviar keys al elemento activo después del título (Tab)
+            webdriver.ActionChains(driver).send_keys(webdriver.Keys.TAB).send_keys(contenido).perform()
+        except Exception as e:
+            print(f"⚠️ Fallo escritura directa, intentando método alternativo: {e}")
+
+        # 4. Tags y Publicar
+        print(f"🏷️ Seleccionando tags: {tags}")
+        try:
+            # Intentamos encontrar el botón de Publish para asegurarnos que la página cargó completa
+            publish_btn = driver.find_element(By.XPATH, "//button[contains(text(), 'Publish')]")
+            
+            # Hacemos scroll y click en Publicar
+            driver.execute_script("arguments[0].scrollIntoView();", publish_btn)
+            time.sleep(2)
+            print("🚀 Haciendo clic en 'Publish Now'...")
+            publish_btn.click()
+            time.sleep(5)
+            
+            # Notificación de éxito
+            enviar_telegram('✅ Artículo publicado con éxito en Publish0x')
+        except Exception as e:
+            print(f"⚠️ Error en paso final (Tags/Publish): {e}")
+        
+        print("✅ Proceso de Selenium finalizado correctamente (Borrador creado).")
+        driver.quit()
+        return True
+
+    except Exception as e:
+        print(f"❌ Error crítico en Selenium: {e}")
+        if 'driver' in locals():
+            driver.quit()
+        return False
 
 def publicar_en_square(contenido):
     """
@@ -504,6 +615,13 @@ if __name__ == "__main__":
                 articulo = generar_articulo_blog(alerta_rsi)
                 if articulo:
                     enviar_telegram(f"📝 *BORRADOR DE ARTÍCULO BLOG:*\n\n{articulo}")
+                    
+                    # Extraer título (Primera línea markdown # Título) y contenido
+                    lineas = articulo.split('\n')
+                    titulo_blog = lineas[0].replace('#', '').strip()
+                    contenido_blog = "\n".join(lineas[1:])
+                    
+                    publicar_en_publish0x(titulo_blog, contenido_blog, ["Crypto", "Trading", alerta_rsi['symbol']])
         
         else:
             # 2. Si no hay alertas VIP, buscamos tendencia normal (Top Gainers)
@@ -540,5 +658,12 @@ if __name__ == "__main__":
                         articulo = generar_articulo_blog(datos_blog)
                         if articulo:
                             enviar_telegram(f"📝 *BORRADOR DE ARTÍCULO BLOG:*\n\n{articulo}")
+                            
+                            # Extraer título y publicar
+                            lineas = articulo.split('\n')
+                            titulo_blog = lineas[0].replace('#', '').strip()
+                            contenido_blog = "\n".join(lineas[1:])
+                            
+                            publicar_en_publish0x(titulo_blog, contenido_blog, ["Crypto", "Trading", tendencia['symbol']])
                     else:
                         print(f"⚠️ No se actualizó el historial para permitir reintento.")

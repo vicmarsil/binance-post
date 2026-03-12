@@ -19,7 +19,7 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install requests groq python-dotenv
+          pip install requests groq python-dotenv selenium webdriver-manager
 
       - name: Ejecutar Bot en Modo FNG
         env:
