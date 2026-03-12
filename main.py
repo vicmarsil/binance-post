@@ -354,19 +354,20 @@ def generar_articulo_blog(datos):
     TEMA: Análisis técnico profundo de {symbol}.
     DATOS: Precio: {precio} USDT. RSI: {rsi}. Cambio 24h: {cambio}%.
     
+    IDIOMA: INGLÉS (ENGLISH). TODO el contenido debe estar en inglés.
+    
     ESTILO DE REDACCIÓN (IMPORTANTE):
     - Tono: "Diario de un Programador". Usa primera persona.
-    - Frases OBLIGATORIAS: "Desde mi terminal en Argentina...", "Analizando los logs de mi script...", "El algoritmo detectó...".
+    - Frases OBLIGATORIAS (En Inglés): "From my terminal in Argentina...", "Analyzing my script logs...", "The algorithm detected...".
     - Enfoque: Técnico pero explicativo. Enseña qué es el RSI o el volumen mientras analizas.
-    - NO uses frases genéricas de IA como "En el mundo digital de hoy". Sé crudo, directo y 'geek'.
-    - Generá el artículo de blog exclusivamente en inglés, usando un lenguaje técnico avanzado, pero mantené las alertas de Telegram en español.
+    - NO uses frases genéricas de IA como "In today's digital world". Sé crudo, directo y 'geek'.
     
     ESTRUCTURA MARKDOWN:
-    1. # Título H1 (Llamativo y técnico)
+    1. # Título H1 (Llamativo y técnico en Inglés)
     2. **INTRODUCCIÓN**: El primer párrafo debe presentar brevemente el proyecto de automatización vIcmAr.
-    3. ## 📟 El hallazgo en la consola (Contexto)
-    4. ## ⚙️ Análisis de los datos (Desglose de precio y RSI)
-    5. ## 🔮 Proyección del código (Conclusión)
+    3. ## 📟 Console Discovery (Contexto)
+    4. ## ⚙️ Data Analysis (Desglose de precio y RSI)
+    5. ## 🔮 Code Projection (Conclusión)
     6. **TAGS**: Al final, incluye obligatoriamente: #Crypto #Python #Trading #{symbol}
     
     Longitud: Mínimo 500 palabras.
@@ -433,36 +434,44 @@ def publicar_en_square(contenido):
 
 def enviar_telegram(mensaje):
     """
-    Envía el mensaje formateado a Telegram. No detiene el bot si falla.
+    Envía el mensaje formateado a Telegram. Divide mensajes largos si es necesario.
     """
     if not TOKEN_TELEGRAM or not ID_TELEGRAM:
         print("⚠️ Telegram: Credenciales no configuradas. Se omite el envío.")
         return
 
     url = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendMessage"
-    payload = {
-        "chat_id": ID_TELEGRAM,
-        "text": mensaje,
-        "parse_mode": "Markdown",
-        "disable_web_page_preview": True
-    }
-    try:
-        response = requests.post(url, json=payload, timeout=10)
-        if response.status_code == 200:
-            print("✅ Telegram enviado correctamente.")
-        else:
-            print(f"⚠️ Error Telegram {response.status_code}: {response.text}")
-            
-            if "chat not found" in response.text:
-                print("💡 AYUDA: El bot no tiene permiso para escribirte. Envíale /start en Telegram o verifica tu ID_TELEGRAM.")
-            # Si falla por formato Markdown (muy común con IA), reintentamos sin formato.
-            # Usamos 'elif' para no reintentar si el chat no existe (sería inútil).
-            elif response.status_code == 400:
-                print("🔄 Reintentando envío sin formato Markdown (texto plano)...")
-                payload.pop("parse_mode", None)
-                requests.post(url, json=payload, timeout=10)
-    except Exception as e:
-        print(f"⚠️ Error enviando a Telegram: {e}")
+    
+    # Telegram limita a 4096 caracteres. Usamos 4000 para dar margen.
+    max_length = 4000
+    mensajes_split = [mensaje[i:i+max_length] for i in range(0, len(mensaje), max_length)]
+
+    for i, msg_chunk in enumerate(mensajes_split):
+        payload = {
+            "chat_id": ID_TELEGRAM,
+            "text": msg_chunk,
+            "parse_mode": "Markdown",
+            "disable_web_page_preview": True
+        }
+        try:
+            print(f"📨 Enviando parte {i+1}/{len(mensajes_split)} a Telegram...")
+            response = requests.post(url, json=payload, timeout=10)
+            if response.status_code == 200:
+                print("✅ Telegram enviado correctamente.")
+            else:
+                print(f"⚠️ Error Telegram {response.status_code}: {response.text}")
+                
+                if "chat not found" in response.text:
+                    print("💡 AYUDA: El bot no tiene permiso para escribirte. Envíale /start en Telegram o verifica tu ID_TELEGRAM.")
+                # Si falla por formato Markdown (muy común con IA), reintentamos sin formato.
+                # Usamos 'elif' para no reintentar si el chat no existe (sería inútil).
+                elif response.status_code == 400:
+                    print("🔄 Reintentando envío sin formato Markdown (texto plano)...")
+                    payload.pop("parse_mode", None)
+                    requests.post(url, json=payload, timeout=10)
+            time.sleep(1) # Pequeña pausa para evitar rate limits
+        except Exception as e:
+            print(f"⚠️ Error enviando a Telegram: {e}")
 
 if __name__ == "__main__":
     print("🤖 Iniciando Bot vIcmAr...")
@@ -506,6 +515,7 @@ if __name__ == "__main__":
                 # Generar y enviar artículo de blog
                 articulo = generar_articulo_blog(alerta_rsi)
                 if articulo:
+                    articulo = articulo.strip()
                     # Separar título y contenido
                     lineas = articulo.split('\n')
                     titulo_blog = lineas[0].replace('#', '').strip()
@@ -550,6 +560,7 @@ if __name__ == "__main__":
                         # Generar y enviar artículo de blog
                         articulo = generar_articulo_blog(datos_blog)
                         if articulo:
+                            articulo = articulo.strip()
                             # Separar título y contenido
                             lineas = articulo.split('\n')
                             titulo_blog = lineas[0].replace('#', '').strip()
