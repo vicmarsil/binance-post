@@ -28,4 +28,6 @@ jobs:
           MODO_PRUEBA: 'False'
           GROQ_MODEL_NAME: "llama-3.3-70b-versatile"
           TIPO_BOT: "FNG"  # 👈 Esto activa el nuevo modo en main.py
+          TOKEN_TELEGRAM: ${{ secrets.TOKEN_TELEGRAM }}
+          ID_TELEGRAM: ${{ secrets.ID_TELEGRAM }}
         run: python main.py

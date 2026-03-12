@@ -35,6 +35,8 @@ jobs:
           SQUARE_API_KEY: ${{ secrets.SQUARE_API_KEY || secrets.BINANCE_API_KEY }}
           MODO_PRUEBA: ${{ inputs.modo_prueba || 'false' }} # False por defecto (cron), o lo que elijas manual
           GROQ_MODEL_NAME: "llama-3.3-70b-versatile" # 👈 Modelo de Groq a usar. Cambiar aquí si es deprecado.
+          TOKEN_TELEGRAM: ${{ secrets.TOKEN_TELEGRAM }}
+          ID_TELEGRAM: ${{ secrets.ID_TELEGRAM }}
         run: python main.py
 
       - name: Guardar base de datos (historial)

@@ -19,8 +19,8 @@ GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama-3.3-70b-versatile").strip(
 TIPO_BOT = os.getenv("TIPO_BOT", "TENDENCIA") # 🟢 Nuevo: Selecciona el modo de operación
 
 # Credenciales para Telegram
-TOKEN_TELEGRAM = os.getenv("token_telegram")
-ID_TELEGRAM = os.getenv("id_telegram")
+TOKEN_TELEGRAM = os.getenv("TOKEN_TELEGRAM")
+ID_TELEGRAM = os.getenv("ID_TELEGRAM")
 
 # 🛡️ Parche de seguridad: Si el entorno (.env local) tiene el modelo viejo, forzamos el nuevo.
 # Usamos 'in' para detectar variantes con espacios o comillas
