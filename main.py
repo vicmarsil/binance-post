@@ -439,7 +439,16 @@ def enviar_telegram(mensaje):
         "disable_web_page_preview": True
     }
     try:
-        requests.post(url, json=payload, timeout=5)
+        response = requests.post(url, json=payload, timeout=10)
+        if response.status_code == 200:
+            print("✅ Telegram enviado correctamente.")
+        else:
+            print(f"⚠️ Error Telegram {response.status_code}: {response.text}")
+            # Si falla por formato Markdown (muy común con IA), reintentamos sin formato
+            if response.status_code == 400:
+                print("🔄 Reintentando envío sin formato Markdown (texto plano)...")
+                payload.pop("parse_mode", None)
+                requests.post(url, json=payload, timeout=10)
     except Exception as e:
         print(f"⚠️ Error enviando a Telegram: {e}")
 
