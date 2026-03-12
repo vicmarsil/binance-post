@@ -22,6 +22,11 @@ TIPO_BOT = os.getenv("TIPO_BOT", "TENDENCIA") # 🟢 Nuevo: Selecciona el modo d
 TOKEN_TELEGRAM = os.getenv("TOKEN_TELEGRAM")
 ID_TELEGRAM = os.getenv("ID_TELEGRAM")
 
+# Validación rápida de configuración de Telegram
+if ID_TELEGRAM and not ID_TELEGRAM.lstrip('-').isdigit():
+    print(f"⚠️ ALERTA CONFIG: Tu ID_TELEGRAM ('{ID_TELEGRAM}') parece incorrecto. Debe ser NUMÉRICO (sin letras ni @).")
+    print("   👉 Usa @userinfobot en Telegram para obtener tu número real.")
+
 # 🛡️ Parche de seguridad: Si el entorno (.env local) tiene el modelo viejo, forzamos el nuevo.
 # Usamos 'in' para detectar variantes con espacios o comillas
 if "llama3-8b-8192" in GROQ_MODEL_NAME:
@@ -484,11 +489,15 @@ if __name__ == "__main__":
                 guardar_historial(f"{alerta_rsi['symbol']}_RSI")
                 print(f"💾 Alerta RSI de {alerta_rsi['symbol']} guardada.")
                 
-                msg = f"🚨 *ALERTA RSI DETECTADA* 🚨\n\n" \
-                      f"🪙 *Moneda:* {alerta_rsi['symbol']}\n" \
-                      f"📉 *RSI:* {alerta_rsi['rsi']:.2f}\n" \
-                      f"💵 *Precio:* {alerta_rsi['price']}\n\n" \
-                      f"🔗 [Ver en Binance Square](https://www.binance.com/es-LA/square/profile/victormarsilli)"
+                msg = f"🚨 *ALERTA RSI EXTREMO* 🚨\n" \
+                      f"--------------------------\n" \
+                      f"💎 *Moneda:* {alerta_rsi['symbol']}\n" \
+                      f"💰 *Precio:* {alerta_rsi['price']} USDT\n" \
+                      f"📉 *RSI (1h):* {alerta_rsi['rsi']:.2f}\n" \
+                      f"--------------------------\n" \
+                      f"🤖 *vIcmAr Insight:* Zona de sobreventa detectada.\n" \
+                      f"--------------------------\n" \
+                      f"🔗 [Ver Perfil Binance Square](https://www.binance.com/es-LA/square/profile/victormarsilli)"
                 enviar_telegram(msg)
                 
                 # Generar y enviar artículo de blog
@@ -511,12 +520,16 @@ if __name__ == "__main__":
                         rsi_val, _ = calcular_rsi(tendencia['symbol'])
                         rsi_txt = f"{rsi_val:.2f}" if rsi_val else "N/A"
                         
-                        msg = f"🚀 *OPORTUNIDAD DE TENDENCIA* 🚀\n\n" \
-                              f"🪙 *Moneda:* {tendencia['symbol']}\n" \
-                              f"📈 *Cambio 24h:* {tendencia['percent']}%\n" \
-                              f"📉 *RSI (1h):* {rsi_txt}\n" \
-                              f"💵 *Precio:* {tendencia['lastPrice']}\n\n" \
-                              f"🔗 [Ver en Binance Square](https://www.binance.com/es-LA/square/profile/victormarsilli)"
+                        msg = f"🚀 *TENDENCIA DETECTADA* 🚀\n" \
+                              f"--------------------------\n" \
+                              f"🔥 *Moneda:* {tendencia['symbol']}\n" \
+                              f"📈 *Cambio 24h:* +{tendencia['percent']}%\n" \
+                              f"💰 *Precio:* {tendencia['lastPrice']} USDT\n" \
+                              f"📊 *RSI (1h):* {rsi_txt}\n" \
+                              f"--------------------------\n" \
+                              f"🤖 *vIcmAr Insight:* Tendencia detectada por volumen atípico.\n" \
+                              f"--------------------------\n" \
+                              f"🔗 [Ver Perfil Binance Square](https://www.binance.com/es-LA/square/profile/victormarsilli)"
                         enviar_telegram(msg)
                         
                         # Preparamos datos completos para el blog
