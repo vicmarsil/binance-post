@@ -49,10 +49,17 @@ jobs:
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'actions@github.com'
           
-          git add historial.json
-          # Hace commit y push solo si hubo cambios en el historial
-          git commit -m "💾 Actualizar historial de publicaciones" || echo "⚠️ No hubo cambios para guardar"
+          # Estrategia agresiva anti-conflictos:
+          # 1. Respaldamos el historial nuevo generado en esta ejecución
+          cp historial.json historial_temp.json || true
           
-          # Sincronización robusta: Trae cambios remotos (rebase) antes de subir
-          git pull --rebase origin main || echo "⚠️ Rebase falló, intentando continuar..."
-          git push origin main || (git pull --rebase origin main && git push origin main)
+          # 2. Descartamos cualquier cambio en Git para que el Pull sea 100% limpio
+          git checkout -- historial.json || true
+          git pull origin main --rebase || true
+          
+          # 3. Restauramos nuestro archivo y lo forzamos como la única verdad
+          mv historial_temp.json historial.json || true
+          git add historial.json
+          
+          git commit -m "💾 Actualizar historial de publicaciones" || echo "⚠️ No hubo cambios para guardar"
+          git push origin main || echo "⚠️ Falló el push (posible colisión exacta), se ignorará y reintentará en el próximo ciclo."
