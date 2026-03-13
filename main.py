@@ -84,7 +84,8 @@ def analizar_oportunidades():
     endpoints = [
         "https://api.binance.com/api/v3/ticker/24hr",
         "https://api1.binance.com/api/v3/ticker/24hr",
-        "https://api2.binance.com/api/v3/ticker/24hr"
+        "https://api2.binance.com/api/v3/ticker/24hr",
+        "https://api.binance.us/api/v3/ticker/24hr"
     ]
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -92,12 +93,15 @@ def analizar_oportunidades():
 
     for symbol in MONEDAS_ANALISIS:
         ticker = None
+        base_url = "https://api.binance.com"
+
         for url_ticker in endpoints:
             try:
                 # 1. Obtener Datos de Precio 24h con rotación
                 resp = requests.get(url_ticker, params={'symbol': symbol}, headers=headers, timeout=15)
                 if resp.status_code == 200:
                     ticker = resp.json()
+                    base_url = url_ticker.split("/api")[0]
                     break # Éxito, salimos del bucle de endpoints
                 else:
                     print(f"⚠️ Error {resp.status_code} conectando a {url_ticker}")
@@ -111,7 +115,7 @@ def analizar_oportunidades():
 
         try:
             # 2. Calcular RSI 1h
-            rsi, _ = calcular_rsi(symbol)
+            rsi, _ = calcular_rsi(symbol, base_url=base_url, headers=headers)
             if rsi is None: continue
 
             candidatos.append({
@@ -249,15 +253,15 @@ def generar_post_fng(datos_fng):
         print(f"⚠️ Error generando texto F&G con Groq: {e}")
         return None
 
-def calcular_rsi(symbol, period=14):
+def calcular_rsi(symbol, period=14, base_url="https://api.binance.com", headers=None):
     """
     Calcula el RSI (1h) para detectar sobreventa.
     """
     try:
-        url = "https://api.binance.com/api/v3/klines"
+        url = f"{base_url}/api/v3/klines"
         # Traemos 100 velas de 1h para calcular bien el promedio
         params = {'symbol': symbol, 'interval': '1h', 'limit': 100}
-        response = requests.get(url, params=params, timeout=5)
+        response = requests.get(url, params=params, headers=headers, timeout=10)
         data = response.json()
         
         if not data or len(data) < period + 1:
