@@ -115,6 +115,22 @@ def analizar_oportunidades():
     2. Alta Volatilidad: Mayor cambio % absoluto si no hay RSI extremo.
     """
     print(f"🔍 Iniciando escaneo de mercado: {len(MONEDAS_ANALISIS)} activos...")
+    
+    # --- FILTRO ANTI-REPETICIÓN ---
+    historial = cargar_historial()
+    ahora = time.time()
+    # Filtramos monedas usadas en las últimas 16 horas para forzar variedad
+    monedas_filtradas = [
+        m for m in MONEDAS_ANALISIS 
+        if (ahora - historial.get(m.replace("USDT", ""), 0)) > (16 * 3600)
+    ]
+    
+    if not monedas_filtradas:
+        print("⚠️ Todas las monedas son recientes. Usando lista completa para asegurar publicación.")
+        monedas_filtradas = MONEDAS_ANALISIS
+    else:
+        print(f"ℹ️ Lista filtrada: {len(monedas_filtradas)} monedas candidatas (se ocultaron {len(MONEDAS_ANALISIS)-len(monedas_filtradas)} recientes).")
+
     candidatos = []
 
     # Endpoints de respaldo y Headers para evitar bloqueos
@@ -128,7 +144,7 @@ def analizar_oportunidades():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
-    for symbol in MONEDAS_ANALISIS:
+    for symbol in monedas_filtradas:
         ticker = None
         base_url = "https://api.binance.com"
 
