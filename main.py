@@ -41,6 +41,20 @@ ARCHIVO_HISTORIAL = "historial.json"
 MONEDAS_ANALISIS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 
                     'DOGEUSDT', 'ADAUSDT', 'AVAXUSDT', 'TRXUSDT', 'LINKUSDT']
 
+# Mapeo para CoinGecko (Backup si Binance falla)
+COINGECKO_IDS = {
+    'BTCUSDT': 'bitcoin',
+    'ETHUSDT': 'ethereum',
+    'BNBUSDT': 'binancecoin',
+    'SOLUSDT': 'solana',
+    'XRPUSDT': 'ripple',
+    'DOGEUSDT': 'dogecoin',
+    'ADAUSDT': 'cardano',
+    'AVAXUSDT': 'avalanche-2',
+    'TRXUSDT': 'tron',
+    'LINKUSDT': 'chainlink'
+}
+
 # Validación básica de seguridad
 if not GROQ_API_KEY:
     raise ValueError("❌ Error: La variable GROQ_API_KEY no está configurada.")
@@ -71,6 +85,29 @@ def guardar_historial(symbol):
     with open(ARCHIVO_HISTORIAL, "w") as f:
         json.dump(historial, f, indent=4)
 
+def obtener_datos_coingecko(symbol):
+    """Backup: Obtiene precio y cambio 24h desde CoinGecko."""
+    try:
+        cg_id = COINGECKO_IDS.get(symbol)
+        if not cg_id: return None
+        
+        url = "https://api.coingecko.com/api/v3/simple/price"
+        params = {'ids': cg_id, 'vs_currencies': 'usd', 'include_24hr_change': 'true'}
+        headers = {"User-Agent": "Mozilla/5.0"} # CoinGecko requiere User-Agent
+        resp = requests.get(url, params=params, headers=headers, timeout=10)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            if cg_id in data:
+                # Adaptamos formato para que sea idéntico al de Binance
+                return {
+                    'lastPrice': data[cg_id]['usd'],
+                    'priceChangePercent': data[cg_id]['usd_24h_change']
+                }
+    except Exception as e:
+        print(f"⚠️ Error CoinGecko ({symbol}): {e}")
+    return None
+
 def analizar_oportunidades():
     """
     Analiza la lista MONEDAS_ANALISIS y selecciona la MEJOR oportunidad basada en:
@@ -82,10 +119,10 @@ def analizar_oportunidades():
 
     # Endpoints de respaldo y Headers para evitar bloqueos
     endpoints = [
+        "https://api.binance.us/api/v3/ticker/24hr",
         "https://api.binance.com/api/v3/ticker/24hr",
         "https://api1.binance.com/api/v3/ticker/24hr",
-        "https://api2.binance.com/api/v3/ticker/24hr",
-        "https://api.binance.us/api/v3/ticker/24hr"
+        "https://api2.binance.com/api/v3/ticker/24hr"
     ]
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -103,6 +140,8 @@ def analizar_oportunidades():
                     ticker = resp.json()
                     base_url = url_ticker.split("/api")[0]
                     break # Éxito, salimos del bucle de endpoints
+                elif resp.status_code == 451:
+                    print(f"⚠️ Bloqueo regional detectado en {url_ticker}, saltando a API secundaria...")
                 else:
                     print(f"⚠️ Error {resp.status_code} conectando a {url_ticker}")
             except Exception as e:
@@ -110,13 +149,24 @@ def analizar_oportunidades():
                 continue
 
         if not ticker:
-            print(f"❌ No se pudo obtener datos para {symbol} tras intentar todos los endpoints.")
-            continue
+            # Si Binance falla completamente, intentamos CoinGecko
+            print(f"⚠️ Binance bloqueado para {symbol}. Intentando CoinGecko...")
+            ticker = obtener_datos_coingecko(symbol)
+            if ticker:
+                base_url = None # Indicamos que no hay API de Binance para RSI
+            else:
+                print(f"❌ No se pudo obtener datos para {symbol} en ninguna fuente.")
+                continue
 
         try:
             # 2. Calcular RSI 1h
-            rsi, _ = calcular_rsi(symbol, base_url=base_url, headers=headers)
-            if rsi is None: continue
+            if base_url:
+                rsi, _ = calcular_rsi(symbol, base_url=base_url, headers=headers)
+            else:
+                rsi = 50 # RSI Neutro si usamos CoinGecko (solo estrategia de volatilidad)
+            
+            # Si falla el RSI (None) pero tenemos precio, usamos 50 para no descartar la moneda
+            if rsi is None: rsi = 50
 
             candidatos.append({
                 "symbol": symbol.replace("USDT", ""),
@@ -295,6 +345,7 @@ def calcular_rsi(symbol, period=14, base_url="https://api.binance.com", headers=
             
         return rsi, closes[-1]
     except Exception as e:
+        # print(f"⚠️ Debug RSI {symbol}: {e}") # Descomentar para depuración profunda
         return None, None
 
 def generar_post_rsi(datos):
