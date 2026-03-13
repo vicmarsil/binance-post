@@ -8,6 +8,7 @@ import requests
 from groq import Groq
 import json
 import time
+import random
 from datetime import datetime, timedelta, timezone
 import urllib.parse
 
@@ -237,6 +238,16 @@ def generar_post_inteligente(datos_mercado):
     if rsi > 70: estado_rsi = "Sobrecompra (Riesgo de corrección)"
     elif rsi < 30: estado_rsi = "Sobreventa (Oportunidad de rebote)"
 
+    # --- VARIACIÓN ALEATORIA DE ESTILO ---
+    estilos = [
+        "Enfócate en la psicología de masa (Miedo vs Codicia).",
+        "Analiza niveles técnicos clave (Soportes y Resistencias).",
+        "Sé extremadamente breve, directo y con sentido de urgencia.",
+        "Usa un tono institucional, serio y analítico.",
+        "Plantea un escenario de riesgo vs recompensa."
+    ]
+    estilo_seleccionado = random.choice(estilos)
+
     prompt = f"""
     Actúa como un trader experto y carismático en Binance Square.
     Tu objetivo es escribir un post que parezca 100% humano, natural y fluido.
@@ -246,6 +257,7 @@ def generar_post_inteligente(datos_mercado):
     - Precio: {precio} USDT (+{cambio}%)
     - RSI (1h): {rsi:.1f} ({estado_rsi})
     - Contexto: {contexto_tecnico}
+    - ENFOQUE DE REDACCIÓN OBLIGATORIO: {estilo_seleccionado}
     
     INSTRUCCIONES PARA EVITAR SONAR COMO UN ROBOT:
     1. 🚫 PROHIBIDO USAR LISTAS (No uses formato "1. Gancho 2. Dato..."). Escribe párrafos conversacionales.
