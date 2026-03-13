@@ -690,14 +690,30 @@ if __name__ == "__main__":
                     titulo_blog = lineas[0].replace('#', '').strip()
                     contenido_blog = "\n".join(lineas[1:]).strip()
                     
-                    mensaje_final = (
-                        f"📌 <b>{titulo_blog}</b>\n"
-                        f"------------------------------\n"
-                        f"📝 <b>ARTICLE:</b>\n{contenido_blog}\n"
-                        f"------------------------------\n"
-                        f"🔗 <a href='https://www.binance.com/es-LA/square/profile/victormarsilli'>Source: Binance Square</a>"
-                    )
+                    # Extraer hashtags usando expresiones regulares
+                    import re
+                    hashtags = re.findall(r'#\w+', contenido_blog)
+                    hashtags_unicos = list(dict.fromkeys(hashtags)) # Eliminar duplicados
                     
-                    enviar_telegram_multimedia(mensaje_final, img_url)
+                    # Limpiar el cuerpo del texto para que no tenga los hashtags al final
+                    texto_limpio = re.sub(r'#\w+', '', contenido_blog).strip()
+                    texto_limpio = re.sub(r'(?i)\bTAGS:\s*', '', texto_limpio).strip()
+
+                    # Solo enviar reporte de texto a las 09:00 UTC (6 AM Arg) y 22:00 UTC (7 PM Arg)
+                    if hora_actual in [9, 22]:
+                        print("⏰ Hora de reporte. Enviando mensajes fragmentados a Telegram...")
+                        
+                        enviar_telegram(f"📌 {titulo_blog}") # 1. Título por separado
+                        time.sleep(1) # Pausa para asegurar el orden de llegada a tu teléfono
+                        
+                        enviar_telegram(texto_limpio) # 2. Todo el texto listo para copiar y pegar
+                        time.sleep(1)
+                        
+                        for tag in hashtags_unicos: # 3. Un mensaje individual por cada hashtag
+                            enviar_telegram(tag)
+                            time.sleep(0.5)
+                    else:
+                        print(f"🔇 Telegram silenciado. (Hora actual UTC: {hora_actual}. Solo envía a las 9 y 22 UTC).")
                 else:
-                    enviar_telegram("⚠️ No se pudo generar el artículo de blog, pero el post de Square está activo.")
+                    if hora_actual in [9, 22]:
+                        enviar_telegram("⚠️ No se pudo generar el artículo de blog, pero el post de Square está activo.")
