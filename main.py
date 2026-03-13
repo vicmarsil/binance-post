@@ -205,37 +205,42 @@ def generar_post_inteligente(datos_mercado):
     """
     moneda = datos_mercado['symbol']
     cambio = datos_mercado['percent']
+    rsi = datos_mercado.get('rsi', 50)
     
     # Formateo visual "Limpieza Pro": Quita ceros extra (Ej: 0.5000 -> 0.5 | 0.00976000 -> 0.00976)
     precio = "{:.8f}".format(float(datos_mercado['lastPrice'])).rstrip("0").rstrip(".")
 
-    # Lógica para mejorar el gancho (Hook) si la subida es fuerte
-    instruccion_extra = ""
+    # Contexto dinámico para que la IA tenga variedad en su análisis
+    contexto_tecnico = "Tendencia normal de mercado."
     if float(cambio) > 20:
-        instruccion_extra = "- MENCIONA: Niveles de Sobrecompra (RSI) o Soportes clave para dar imagen de experto."
+        contexto_tecnico = "Subida explosiva (posible FOMO). Menciona cautela por volatilidad."
+    elif float(cambio) > 5:
+        contexto_tecnico = "Tendencia alcista sólida. Menciona ruptura de niveles."
+    
+    estado_rsi = "Neutro"
+    if rsi > 70: estado_rsi = "Sobrecompra (Riesgo de corrección)"
+    elif rsi < 30: estado_rsi = "Sobreventa (Oportunidad de rebote)"
 
     prompt = f"""
-    Actúa como un 'Top Creator' de Binance Square (estilo influencer inteligente y viral).
-    DATOS: {moneda} cotiza a {precio} USDT (+{cambio}% en 24h).
+    Actúa como un trader experto y carismático en Binance Square.
+    Tu objetivo es escribir un post que parezca 100% humano, natural y fluido.
     
-    OBJETIVO: Escribir un post que genere likes y seguidores.
+    DATOS DEL MERCADO:
+    - Activo: {moneda}
+    - Precio: {precio} USDT (+{cambio}%)
+    - RSI (1h): {rsi:.1f} ({estado_rsi})
+    - Contexto: {contexto_tecnico}
     
-    ESTILO (Imita a los mejores):
-    - Usa emojis visuales al inicio de las frases importantes.
-    - Párrafos muy cortos y espaciosos.
-    - Tono: Entusiasta, directo y con autoridad.
-    
-    ESTRUCTURA OBLIGATORIA:
-    1. 🚨 GANCHO VISUAL: Título urgente (Ej: "¡{moneda} SE MUEVE!" o "🚀 ¿Oportunidad en {moneda}?").
-    2. 📊 EL DATO: Precio actual y subida.
-    3. 🧠 ANÁLISIS FLASH: ¿Por qué sube? (Volumen / Rompió resistencia / Hype). Sé breve.
-    4. 🎯 CONCLUSIÓN RÁPIDA: ¿Sigue subiendo o esperamos?
-    5. 👇 CIERRE VIRAL: "Dale Like ❤️ y Sígueme para más alertas 🦁".
+    INSTRUCCIONES PARA EVITAR SONAR COMO UN ROBOT:
+    1. 🚫 PROHIBIDO USAR LISTAS (No uses formato "1. Gancho 2. Dato..."). Escribe párrafos conversacionales.
+    2. 🚫 EVITA FRASES CLICHÉ: No digas simplemente "Sube por hype". Usa variaciones como "fuerte presión de compra", "despertar técnico", "rompiendo resistencias" o "volumen institucional".
+    3. Integra los datos ({precio}, RSI) dentro de las oraciones de forma narrativa.
+    4. Tono: Entusiasta pero analítico. Habla como si le contaras una novedad a un amigo trader.
+    5. Cierra con una pregunta abierta para generar comentarios.
     
     REGLAS:
-    - Máximo 500 caracteres.
-    - OBLIGATORIO: Cashtags ${moneda}, $BNB y #{moneda}.
-    {instruccion_extra}
+    - Máximo 450 caracteres.
+    - Incluye al final: ${moneda} $BNB #{moneda}
     """
 
     try:
@@ -503,9 +508,9 @@ def obtener_imagen_binance(symbol):
         resp = requests.get(url, params=params, timeout=5)
         if resp.status_code == 200:
             data = resp.json()
-            logo = data.get("data", {}).get("logoUrl")
-            if logo: 
-                return logo
+            product_data = data.get("data")
+            if product_data and isinstance(product_data, dict):
+                return product_data.get("logoUrl")
     except Exception as e:
         print(f"⚠️ Warning buscando logo Binance: {e}")
     
