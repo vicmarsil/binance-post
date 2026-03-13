@@ -80,14 +80,36 @@ def analizar_oportunidades():
     print(f"🔍 Iniciando escaneo de mercado: {len(MONEDAS_ANALISIS)} activos...")
     candidatos = []
 
-    for symbol in MONEDAS_ANALISIS:
-        try:
-            # 1. Obtener Datos de Precio 24h
-            url_ticker = "https://api.binance.com/api/v3/ticker/24hr"
-            resp = requests.get(url_ticker, params={'symbol': symbol}, timeout=5)
-            if resp.status_code != 200: continue
-            ticker = resp.json()
+    # Endpoints de respaldo y Headers para evitar bloqueos
+    endpoints = [
+        "https://api.binance.com/api/v3/ticker/24hr",
+        "https://api1.binance.com/api/v3/ticker/24hr",
+        "https://api2.binance.com/api/v3/ticker/24hr"
+    ]
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
 
+    for symbol in MONEDAS_ANALISIS:
+        ticker = None
+        for url_ticker in endpoints:
+            try:
+                # 1. Obtener Datos de Precio 24h con rotación
+                resp = requests.get(url_ticker, params={'symbol': symbol}, headers=headers, timeout=15)
+                if resp.status_code == 200:
+                    ticker = resp.json()
+                    break # Éxito, salimos del bucle de endpoints
+                else:
+                    print(f"⚠️ Error {resp.status_code} conectando a {url_ticker}")
+            except Exception as e:
+                print(f"⚠️ Error de conexión en {url_ticker}: {e}")
+                continue
+
+        if not ticker:
+            print(f"❌ No se pudo obtener datos para {symbol} tras intentar todos los endpoints.")
+            continue
+
+        try:
             # 2. Calcular RSI 1h
             rsi, _ = calcular_rsi(symbol)
             if rsi is None: continue
