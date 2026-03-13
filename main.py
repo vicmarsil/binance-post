@@ -40,7 +40,7 @@ ARCHIVO_HISTORIAL = "historial.json"
 
 # --- LISTA DE MONEDAS A ANALIZAR (MAJORS & ALTA LIQUIDEZ) ---
 MONEDAS_ANALISIS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 
-                    'DOGEUSDT', 'ADAUSDT', 'AVAXUSDT', 'TRXUSDT', 'LINKUSDT']
+                    'ADAUSDT', 'AVAXUSDT', 'TRXUSDT', 'LINKUSDT', 'DOTUSDT', 'MATICUSDT']
 
 # Mapeo para CoinGecko (Backup si Binance falla)
 COINGECKO_IDS = {
@@ -49,11 +49,12 @@ COINGECKO_IDS = {
     'BNBUSDT': 'binancecoin',
     'SOLUSDT': 'solana',
     'XRPUSDT': 'ripple',
-    'DOGEUSDT': 'dogecoin',
     'ADAUSDT': 'cardano',
     'AVAXUSDT': 'avalanche-2',
     'TRXUSDT': 'tron',
-    'LINKUSDT': 'chainlink'
+    'LINKUSDT': 'chainlink',
+    'DOTUSDT': 'polkadot',
+    'MATICUSDT': 'matic-network'
 }
 
 # Validación básica de seguridad
