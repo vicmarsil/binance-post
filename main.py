@@ -428,30 +428,30 @@ def generar_articulo_blog(datos):
     cambio = datos.get('percent', 'N/A')
     
     prompt = f"""
-    Actúa como vIcmAr, un bot de trading programado en Python que opera desde servidores en la nube pero con "alma argentina".
+    Act as vIcmAr, an automated Python trading bot running on cloud servers but with an "Argentine soul".
     
-    TAREA: Escribir un artículo de blog técnico y educativo en Markdown para Publish0x.
-    TEMA: Análisis técnico profundo de {symbol}.
-    DATOS: Precio: {precio} USDT. RSI: {rsi}. Cambio 24h: {cambio}%.
+    TASK: Write a technical and educational blog article for Publish0x.
+    TOPIC: Deep technical analysis of {symbol}.
+    DATA: Price: {precio} USDT. RSI: {rsi}. 24h Change: {cambio}%.
     
-    IDIOMA: INGLÉS (ENGLISH). TODO el contenido debe estar en inglés.
+    LANGUAGE: ENGLISH. The entire content MUST be in English.
     
-    ESTILO DE REDACCIÓN (IMPORTANTE):
-    - Tono: "Diario de un Programador". Usa primera persona.
-    - Frases OBLIGATORIAS (En Inglés): "From my terminal in Argentina...", "Analyzing my script logs...", "The algorithm detected...".
-    - Enfoque: Técnico pero explicativo. Enseña qué es el RSI o el volumen mientras analizas.
-    - NO uses frases genéricas de IA como "In today's digital world". Sé crudo, directo y 'geek'.
-    - FORMATO: Usa HTML simple compatible con Telegram. Usa <b> para negritas/títulos y <i> para énfasis. NO USES MARKDOWN (** o __).
+    WRITING STYLE (IMPORTANT):
+    - Tone: "Diary of a Crypto Programmer". Use first person.
+    - MANDATORY phrases: "From my terminal in Argentina...", "Analyzing my script logs...", "The algorithm detected...".
+    - Focus: Technical but explanatory. Explain concepts like RSI or volume while analyzing.
+    - DO NOT use generic AI phrases like "In today's digital world". Be raw, direct, and 'geeky'.
+    - FORMAT: Use simple HTML compatible with Telegram. Use <b> for bold/titles and <i> for emphasis. DO NOT USE MARKDOWN (** or __).
     
-    ESTRUCTURA (HTML):
-    1. <b>Título Principal</b> (Llamativo y técnico)
-    2. **INTRODUCCIÓN**: El primer párrafo debe presentar brevemente el proyecto de automatización vIcmAr.
-    3. <b>📟 Console Discovery</b> (Contexto)
-    4. <b>⚙️ Data Analysis</b> (Desglose de precio y RSI)
-    5. <b>🔮 Code Projection</b> (Conclusión)
-    6. **TAGS**: Al final, genera una lista de 5 tags recomendados (ej: #Bitcoin #Trading #AI #RSI #{symbol}).
+    STRUCTURE (HTML):
+    1. <b>Main Title</b> (Catchy and technical)
+    2. <b>INTRODUCTION</b>: The first paragraph must briefly introduce the vIcmAr automation project.
+    3. <b>📟 Console Discovery</b> (Context)
+    4. <b>⚙️ Data Analysis</b> (Price and RSI breakdown)
+    5. <b>🔮 Code Projection</b> (Conclusion)
+    6. <b>TAGS</b>: At the end, generate a list of 5 recommended tags (e.g., #Bitcoin #Trading #AI #RSI #{symbol}).
     
-    Longitud: Mínimo 500 palabras.
+    Length: Minimum 500 words.
     """
     
     try:
@@ -590,8 +590,8 @@ def enviar_telegram(mensaje):
     url = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendMessage"
     
     # Telegram limita a 4096 caracteres.
-    # Fragmentación inteligente: 2000 chars y corte por saltos de línea para proteger el Markdown.
-    max_length = 2000
+    # Fragmentación inteligente: 4000 chars y corte por saltos de línea para proteger el HTML.
+    max_length = 4000
     mensajes_split = []
     
     temp_msg = mensaje
@@ -701,17 +701,11 @@ if __name__ == "__main__":
 
                     # Solo enviar reporte de texto a las 09:00 UTC (6 AM Arg) y 22:00 UTC (7 PM Arg)
                     if hora_actual in [9, 22]:
-                        print("⏰ Hora de reporte. Enviando mensajes fragmentados a Telegram...")
+                        print("⏰ Hora de reporte. Enviando mensaje único a Telegram...")
                         
-                        enviar_telegram(f"📌 {titulo_blog}") # 1. Título por separado
-                        time.sleep(1) # Pausa para asegurar el orden de llegada a tu teléfono
-                        
-                        enviar_telegram(texto_limpio) # 2. Todo el texto listo para copiar y pegar
-                        time.sleep(1)
-                        
-                        for tag in hashtags_unicos: # 3. Un mensaje individual por cada hashtag
-                            enviar_telegram(tag)
-                            time.sleep(0.5)
+                        tags_str = " ".join(hashtags_unicos)
+                        mensaje_completo = f"📌 {titulo_blog}\n\n{texto_limpio}\n\n{tags_str}"
+                        enviar_telegram(mensaje_completo)
                     else:
                         print(f"🔇 Telegram silenciado. (Hora actual UTC: {hora_actual}. Solo envía a las 9 y 22 UTC).")
                 else:
