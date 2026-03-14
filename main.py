@@ -225,8 +225,15 @@ def generar_post_inteligente(datos_mercado):
     cambio = datos_mercado['percent']
     rsi = datos_mercado.get('rsi', 50)
     
-    # Formateo visual "Limpieza Pro": Quita ceros extra (Ej: 0.5000 -> 0.5 | 0.00976000 -> 0.00976)
-    precio = "{:.8f}".format(float(datos_mercado['lastPrice'])).rstrip("0").rstrip(".")
+    # Formateo visual más seguro para evitar precios en '0' o vacíos
+    precio_float = float(datos_mercado['lastPrice'])
+    if precio_float < 1:
+        # Para monedas menores a 1$ (ej. TRX, ADA)
+        precio = f"{precio_float:.5f}".rstrip("0").rstrip(".")
+        if not precio: precio = "0"
+    else:
+        # Para monedas como BTC, ETH, SOL
+        precio = f"{precio_float:.2f}"
 
     # Contexto dinámico para que la IA tenga variedad en su análisis
     contexto_tecnico = "Tendencia normal de mercado."
@@ -238,37 +245,43 @@ def generar_post_inteligente(datos_mercado):
     estado_rsi = "Neutro"
     if rsi > 70: estado_rsi = "Sobrecompra (Riesgo de corrección)"
     elif rsi < 30: estado_rsi = "Sobreventa (Oportunidad de rebote)"
+    
+    # Condicionar si hablamos del RSI. Si es 50 (neutro o por defecto de API caída), omitimos mencionarlo.
+    if rsi != 50:
+        info_rsi = f"- RSI (1h): {rsi:.1f} ({estado_rsi})"
+        instruccion_datos = f"Integra los datos ({precio}, RSI) dentro de las oraciones de forma narrativa."
+    else:
+        info_rsi = "- Enfoque: Acción del precio, volatilidad y tendencia reciente."
+        instruccion_datos = f"Integra el precio ({precio}) y la variación dentro de las oraciones. NO menciones el RSI en absoluto."
 
-    # --- VARIACIÓN ALEATORIA DE ESTILO ---
-    estilos = [
-        "Enfócate en la psicología de masa (Miedo vs Codicia).",
-        "Analiza niveles técnicos clave (Soportes y Resistencias).",
-        "Sé extremadamente breve, directo y con sentido de urgencia.",
-        "Usa un tono institucional, serio y analítico.",
-        "Plantea un escenario de riesgo vs recompensa."
+    # --- VARIACIÓN ALEATORIA DE ESTRUCTURA Y TONO (ANTI-REPETICIÓN) ---
+    enfoques = [
+        "Empieza directamente con un dato histórico fascinante o curiosidad sobre la moneda, y luego conecta eso con la variación de precio actual.",
+        "Ve directo al grano con el análisis del precio y volatilidad, y luego menciona una noticia o detalle técnico del proyecto que respalde el movimiento.",
+        "Inicia con una pregunta provocativa sobre el futuro del activo. Analiza el precio actual y da una píldora de conocimiento experto.",
+        "Usa un tono de urgencia (alerta de tendencia). Destaca el precio primero, luego lanza un 'dato que pocos saben' sobre su tecnología."
     ]
-    estilo_seleccionado = random.choice(estilos)
+    enfoque_seleccionado = random.choice(enfoques)
 
     prompt = f"""
-    Actúa como un trader experto y carismático en Binance Square.
-    Tu objetivo es escribir un post que parezca 100% humano, natural y fluido.
+    Actúa como un creador premium de Binance Square. Eres experto, magnético y NUNCA suenas repetitivo.
     
     DATOS DEL MERCADO:
     - Activo: {moneda}
-    - Precio: {precio} USDT (+{cambio}%)
-    - RSI (1h): {rsi:.1f} ({estado_rsi})
+    - Precio: {precio} USDT (Variación: {cambio}%)
+    {info_rsi}
     - Contexto: {contexto_tecnico}
-    - ENFOQUE DE REDACCIÓN OBLIGATORIO: {estilo_seleccionado}
     
-    INSTRUCCIONES PARA EVITAR SONAR COMO UN ROBOT:
-    1. 🚫 PROHIBIDO USAR LISTAS (No uses formato "1. Gancho 2. Dato..."). Escribe párrafos conversacionales.
-    2. 🚫 EVITA FRASES CLICHÉ: No digas simplemente "Sube por hype". Usa variaciones como "fuerte presión de compra", "despertar técnico", "rompiendo resistencias" o "volumen institucional".
-    3. Integra los datos ({precio}, RSI) dentro de las oraciones de forma narrativa.
-    4. Tono: Entusiasta pero analítico. Habla como si le contaras una novedad a un amigo trader.
-    5. Cierra con una pregunta abierta para generar comentarios.
+    INSTRUCCIONES DE REDACCIÓN OBLIGATORIAS:
+    - 🎯 ENFOQUE DE ESTA PUBLICACIÓN: {enfoque_seleccionado}
+    - 🚫 CERO PLANTILLAS: No uses siempre la misma estructura. Cambia la forma en la que presentas el post (a veces usa título, a veces entra directo al texto).
+    - 🚫 PROHIBIDO hacer listas enumeradas (nada de 1. 2. 3.). Usa párrafos fluidos de 2-3 líneas máximo.
+    - 🧠 VALOR AGREGADO: Es fundamental que incluyas una curiosidad o aspecto técnico real de la red/ecosistema de {moneda}.
+    - 📊 INTEGRACIÓN: {instruccion_datos} Hazlo de forma conversacional.
+    - 👇 ENGAGEMENT: Termina con una pregunta fresca acorde al contexto, nunca repitas el típico "te leo en comentarios".
     
     REGLAS:
-    - Máximo 450 caracteres.
+    - Máximo 500 caracteres.
     - Incluye al final: ${moneda} $BNB #{moneda}
     """
 
@@ -315,14 +328,16 @@ def generar_post_fng(datos_fng):
     - Párrafos cortos.
     - Tono: Experto pero cercano.
     
-    ESTRUCTURA:
-    1. 🌡️ TÍTULO: "SENTIMIENTO CRYPTO: {clasificacion}" (Elige emoji: 🥶 Miedo / 🤑 Codicia).
-    2. 📊 EL DATO: Estamos en {valor}/100.
-    3. 🧠 ANÁLISIS: Breve interpretación psicológica del mercado hoy.
-    4. 👇 CIERRE: "¿Compras o vendes en este nivel? Te leo 👇 #Bitcoin #FearAndGreed"
+    INSTRUCCIONES ANTI-REPETICIÓN:
+    - 🔄 TÍTULO DINÁMICO: No uses siempre el mismo título. Inventa titulares variados basados en el sentimiento actual ({clasificacion}).
+    - 📊 EL DATO: Menciona que estamos en {valor}/100 de forma natural en el texto.
+    - 🧠 ANÁLISIS: Haz una interpretación psicológica de lo que esto significa para los inversores HOY. Varía el enfoque (ballenas, pánico retail, etc.).
+    - 👇 CIERRE: Haz una pregunta distinta cada día. No repitas siempre "¿Compras o vendes?".
     
     REGLAS:
+    - 🚫 Prohibido usar formato de listas (1. 2.).
     - Máximo 500 caracteres.
+    - OBLIGATORIO: Hashtags #Bitcoin #FearAndGreed
     """
     
     try:
@@ -391,14 +406,14 @@ def generar_post_rsi(datos):
     Actúa como un trader veterano de Binance Square.
     DATOS: {moneda} está en zona de SOBREVENTA (RSI: {rsi}) en gráfico de 1h. Precio: {precio}.
     
-    OBJETIVO: Alerta de "Buy the Dip" (Oportunidad de rebote).
+    OBJETIVO: Crear una alerta de oportunidad ("Buy the Dip" / Rebote inminente) pero que suene ÚNICA y humana.
     
-    ESTRUCTURA:
-    1. 🔔 TÍTULO: "¡ATENCIÓN {moneda} EN ZONA DE COMPRA!" o "💎 Oportunidad en {moneda}".
-    2. 📉 EL DATO: RSI en {rsi}/100 (Extrema sobreventa).
-    3. 🧠 ANÁLISIS: "Históricamente, tocar estos niveles suele anticipar un rebote técnico a corto plazo."
-    4. 🎯 CONCLUSIÓN: Zona clave para vigilar o acumular.
-    5. 👇 CIERRE: "Dale Like ❤️ si crees que rebota aquí 📈".
+    INSTRUCCIONES ANTI-REPETICIÓN:
+    - 🔄 Varía el gancho inicial (a veces usa 'Atención', otras veces una pregunta directa, otras una observación técnica).
+    - 🧠 Explica el RSI de {rsi}/100 con diferentes palabras cada vez (ej. 'agotamiento de vendedores', 'los osos pierden fuerza', 'zona de acumulación').
+    - 🚫 NO uses frases hechas como "Históricamente, tocar estos niveles...". Sé creativo.
+    - 🚫 NUNCA repitas el mismo cierre. Inventa un llamado a la acción distinto.
+    - 🚫 NO uses listas enumeradas. Escribe en párrafos cortos y fluidos.
     
     REGLAS:
     - Máximo 500 caracteres.
