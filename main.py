@@ -222,7 +222,8 @@ def generar_post_inteligente(datos_mercado):
     Redacta un análisis técnico breve y profesional.
     """
     moneda = datos_mercado['symbol']
-    cambio = datos_mercado['percent']
+    # Formateo a 2 decimales para la variación porcentual (Ej: 0.336 -> 0.34)
+    cambio = f"{float(datos_mercado['percent']):.2f}"
     rsi = datos_mercado.get('rsi', 50)
     
     # Formateo visual más seguro para evitar precios en '0' o vacíos
