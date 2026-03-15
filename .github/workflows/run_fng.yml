@@ -19,7 +19,7 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install requests groq python-dotenv selenium webdriver-manager google-api-python-client google-auth-httplib2 google-auth-oauthlib
+          pip install requests groq python-dotenv selenium webdriver-manager google-api-python-client google-auth-httplib2 google-auth-oauthlib tweepy
 
       - name: Ejecutar Bot en Modo FNG
         env:
@@ -30,4 +30,8 @@ jobs:
           TIPO_BOT: "FNG"  # 👈 Esto activa el nuevo modo en main.py
           TOKEN_TELEGRAM: ${{ secrets.TOKEN_TELEGRAM }}
           ID_TELEGRAM: ${{ secrets.ID_TELEGRAM }}
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
         run: python main.py

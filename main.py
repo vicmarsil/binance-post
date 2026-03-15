@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 import urllib.parse
 from google.oauth2.credentials import Credentials # type: ignore
 from googleapiclient.discovery import build # type: ignore
+import tweepy # type: ignore
 
 # --- CONFIGURACIÓN Y VARIABLES DE ENTORNO ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -32,6 +33,12 @@ BLOG_ID = os.getenv("BLOG_ID")
 # Credenciales para Facebook
 FB_PAGE_ID = os.getenv("FB_PAGE_ID")
 FB_ACCESS_TOKEN = os.getenv("FB_ACCESS_TOKEN")
+
+# Credenciales para X (Twitter)
+TWITTER_API_KEY = os.getenv("TWITTER_API_KEY")
+TWITTER_API_SECRET = os.getenv("TWITTER_API_SECRET")
+TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
+TWITTER_ACCESS_SECRET = os.getenv("TWITTER_ACCESS_SECRET")
 
 # Validación rápida de configuración de Telegram
 if ID_TELEGRAM and not ID_TELEGRAM.lstrip('-').isdigit():
@@ -290,7 +297,7 @@ def generar_post_inteligente(datos_mercado):
     - 👇 ENGAGEMENT: Termina con una pregunta fresca acorde al contexto, nunca repitas el típico "te leo en comentarios".
     
     REGLAS:
-    - Máximo 500 caracteres.
+    - Máximo 260 caracteres ESTRICTO (para que quepa en un Tweet).
     - Incluye al final: ${moneda} $BNB #{moneda}
     """
 
@@ -345,7 +352,7 @@ def generar_post_fng(datos_fng):
     
     REGLAS:
     - 🚫 Prohibido usar formato de listas (1. 2.).
-    - Máximo 500 caracteres.
+    - Máximo 260 caracteres ESTRICTO (para que quepa en un Tweet).
     - OBLIGATORIO: Hashtags #Bitcoin #FearAndGreed
     """
     
@@ -425,7 +432,7 @@ def generar_post_rsi(datos):
     - 🚫 NO uses listas enumeradas. Escribe en párrafos cortos y fluidos.
     
     REGLAS:
-    - Máximo 500 caracteres.
+    - Máximo 260 caracteres ESTRICTO (para que quepa en un Tweet).
     - OBLIGATORIO: Cashtags ${moneda} #BuyTheDip #{moneda}
     """
     # Reutilizamos la lógica de conexión a Groq copiando el bloque try/except simple
@@ -530,6 +537,29 @@ def generar_articulo_bitget(referido):
         return chat_completion.choices[0].message.content
     except Exception as e:
         print(f"⚠️ Error en Groq con Bitget: {e}")
+        return None
+
+def generar_tweet_bitget(referido):
+    """Genera un Tweet específico súper corto para promocionar Bitget."""
+    prompt = f"""
+    Actúa como un influencer Web3 en Twitter.
+    TAREA: Escribir un tweet MUY CORTO, fresco y atractivo promocionando Bitget Wallet.
+    ENLACE OBLIGATORIO A INCLUIR EN EL TEXTO: {referido}
+    
+    REGLAS:
+    - Máximo 260 caracteres EN TOTAL.
+    - NO saludes. Ve directo al grano.
+    - Usa 1 o 2 emojis.
+    - Incluye hashtags #Web3 #Bitget
+    """
+    try:
+        print("✍️ Redactando Tweet promocional de Bitget...")
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}], model=GROQ_MODEL_NAME, temperature=0.7
+        )
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        print(f"⚠️ Error generando Tweet Bitget: {e}")
         return None
 
 def publicar_en_square(contenido):
@@ -720,6 +750,29 @@ def publicar_en_blogger(titulo, contenido, etiquetas, img_url=None):
         print(f"⚠️ Error al publicar en Blogger: {e}")
         return False
 
+def publicar_en_twitter(mensaje):
+    """Publica un tweet usando la API v2 de X (Twitter)."""
+    if MODO_PRUEBA:
+        print(f"\n🧪 [MODO PRUEBA] Simulación de envío a X (Twitter):\n{mensaje}")
+        return True
+        
+    if not all([TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET]):
+        print("⚠️ X (Twitter): Credenciales incompletas. Se omite.")
+        return False
+        
+    print("📡 Enviando publicación a X (Twitter)...")
+    try:
+        client_tw = tweepy.Client(
+            consumer_key=TWITTER_API_KEY, consumer_secret=TWITTER_API_SECRET,
+            access_token=TWITTER_ACCESS_TOKEN, access_token_secret=TWITTER_ACCESS_SECRET
+        )
+        response = client_tw.create_tweet(text=mensaje)
+        print(f"✅ ¡PUBLICADO EN X! ID del Tweet: {response.data['id']}")
+        return True
+    except Exception as e:
+        print(f"❌ Error publicando en X (Twitter): {e}")
+        return False
+
 def publicar_en_facebook(mensaje, img_url=None):
     """Publica en la página de Facebook usando Graph API."""
     if MODO_PRUEBA:
@@ -829,6 +882,7 @@ if __name__ == "__main__":
             post = generar_post_fng(datos)
             if post:
                 publicar_en_square(post)
+                publicar_en_twitter(post)
                 # Nota: No guardamos historial para F&G porque es un post diario único.
     
     elif TIPO_BOT == "BITGET":
@@ -880,6 +934,11 @@ if __name__ == "__main__":
             mensaje_tg = f"📌 <b>{titulo}</b>\n\n{texto_limpio}\n\n🔗 <a href='{REFERIDO_BITGET}'>Solicita tu Bitget Card Aquí</a>\n\n{tags_str}"
             enviar_telegram(mensaje_tg)
             
+            print("📝 Publicando promoción de Bitget en X (Twitter)...")
+            tweet_bitget = generar_tweet_bitget(REFERIDO_BITGET)
+            if tweet_bitget:
+                publicar_en_twitter(tweet_bitget)
+            
         # IMPORTANTE: NO PUBLICAMOS EN BINANCE SQUARE para evitar baneos.
 
     else:
@@ -911,6 +970,7 @@ if __name__ == "__main__":
             # Publicar en Square
             if post_square and publicar_en_square(post_square):
                 print(f"✅ Publicado en Square. Procediendo a Blog/Telegram...")
+                publicar_en_twitter(post_square) # El post corto también va a X
                 guardar_historial(oportunidad['symbol']) # Opcional: Para evitar repetir si fallara algo externo
                 
                 # Generar Artículo Blog Extenso
