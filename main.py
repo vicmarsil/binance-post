@@ -854,7 +854,13 @@ if __name__ == "__main__":
             # Imagen de respaldo estática en caso de que la IA (Pollinations) falle definitivamente
             if not img_url:
                 print("💡 Usando imagen promocional estática de respaldo...")
-                img_url = "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?q=80&w=1024&auto=format&fit=crop"
+                imagenes_respaldo = [
+                    "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?q=80&w=1024&auto=format&fit=crop", # Crypto abstracta
+                    "https://images.unsplash.com/photo-1621504450181-5d356f61d307?q=80&w=1024&auto=format&fit=crop", # Neón tecnológico
+                    "https://images.unsplash.com/photo-1605792657660-596af9009e82?q=80&w=1024&auto=format&fit=crop", # Smartphone y finanzas
+                    "https://images.unsplash.com/photo-1642104704074-907c0698cbd9?q=80&w=1024&auto=format&fit=crop"  # Billetera digital / Bitcoin
+                ]
+                img_url = random.choice(imagenes_respaldo)
 
             print("📝 Publicando promoción de Bitget en Blogger...")
             
