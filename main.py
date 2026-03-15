@@ -516,8 +516,8 @@ def generar_articulo_bitget(referido):
     
     REGLAS ESTRICTAS:
     - Tono: Educativo, humano y entusiasta. NO suenes como un anuncio de teletienda ni hagas spam barato. Aporta valor real.
-    - Enlace: Debes integrar de forma fluida y natural este enlace de referido en el texto invitando a unirse: {referido}
-    - Formato HTML: Usa <b> para subtítulos o texto clave, <i> para énfasis. Párrafos fluidos. NO uses listas 1. 2. 3.
+    - Enlace: OBLIGATORIO integrar el referido usando formato HTML: <a href="{referido}">Únete a Bitget aquí</a>. NUNCA pongas la URL en texto plano.
+    - Formato HTML: Usa <b> para subtítulos, <i> para énfasis y <a> para el enlace. Párrafos fluidos. NO uses listas 1. 2. 3.
     - Estructura: 
       1. PRIMERA LÍNEA: Solo el título principal atractivo (SIN etiquetas HTML).
       2. El resto del post.
@@ -587,9 +587,23 @@ def generar_imagen_ia(symbol, prompt_context="crypto trading chart futuristic st
         encoded_prompt = urllib.parse.quote(full_prompt)
         
         # Generamos URL (Pollinations no requiere API Key)
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={int(time.time())}"
+        initial_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={int(time.time())}"
         print(f"🎨 Generando imagen IA para {symbol}...")
-        return url
+        
+        # Pollinations.ai usa un redirect. Necesitamos la URL final para que Facebook la acepte.
+        # Usamos un timeout largo porque la generación puede tardar.
+        response = requests.get(initial_url, allow_redirects=True, timeout=60)
+        
+        if response.status_code == 200:
+            final_url = response.url
+            print(f"🖼️ URL final de la imagen obtenida: {final_url}")
+            return final_url
+        else:
+            print(f"⚠️ Error {response.status_code} al resolver la URL de la imagen de Pollinations.")
+            return None
+    except requests.exceptions.Timeout:
+        print("⚠️ Timeout: La generación de la imagen tardó demasiado. Se omitirá la imagen.")
+        return None
     except Exception as e:
         print(f"⚠️ Error generando imagen IA: {e}")
         return None
@@ -677,6 +691,8 @@ def publicar_en_blogger(titulo, contenido, etiquetas, img_url=None):
         cuerpo_texto = cuerpo_texto.replace('<b>', '<b style="color: #1a73e8; font-size: 1.15em; display: inline-block; margin-top: 10px;">')
         # Darle estilo de terminal hacker a las etiquetas de código
         cuerpo_texto = cuerpo_texto.replace('<code>', '<code style="background-color: #282c34; color: #98c379; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 0.95em;">')
+        # Hacer que los enlaces destaquen (Color dorado tipo Bitget y abrir en nueva pestaña)
+        cuerpo_texto = cuerpo_texto.replace('<a href=', '<a style="color: #d8a011; font-weight: bold; text-decoration: underline;" target="_blank" href=')
         
         # Envolver todo en un contenedor con fuente moderna e interlineado cómodo
         contenido_html = f"""
@@ -833,7 +849,13 @@ if __name__ == "__main__":
             img_url = generar_imagen_ia("Bitget Wallet", "futuristic digital wallet floating credit card cyberpunk neon web3 payment")
             
             print("📝 Publicando promoción de Bitget en Blogger...")
-            publicar_en_blogger(titulo, texto_limpio, hashtags_unicos, img_url)
+            
+            # Fallback de seguridad: Si la IA desobedeció y dejó la URL en texto plano, la convertimos a enlace HTML forzosamente
+            texto_blogger = texto_limpio
+            if f'href="{REFERIDO_BITGET}"' not in texto_blogger and f"href='{REFERIDO_BITGET}'" not in texto_blogger:
+                texto_blogger = texto_blogger.replace(REFERIDO_BITGET, f'<a href="{REFERIDO_BITGET}">Haz clic aquí para unirte a Bitget</a>')
+                
+            publicar_en_blogger(titulo, texto_blogger, hashtags_unicos, img_url)
             
             print("📝 Publicando promoción de Bitget en Facebook...")
             texto_fb = re.sub(r'<[^>]+>', '', texto_limpio)
