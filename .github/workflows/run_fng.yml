@@ -30,6 +30,7 @@ jobs:
           TIPO_BOT: "FNG"  # 👈 Esto activa el nuevo modo en main.py
           TOKEN_TELEGRAM: ${{ secrets.TOKEN_TELEGRAM }}
           ID_TELEGRAM: ${{ secrets.ID_TELEGRAM }}
+          ID_TELEGRAM_ADMIN: ${{ secrets.ID_TELEGRAM_ADMIN }}
           TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
           TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
           TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}

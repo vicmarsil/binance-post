@@ -30,6 +30,7 @@ jobs:
           REFERIDO_BITGET: ${{ secrets.REFERIDO_BITGET }} # 👈 Variable nueva
           TOKEN_TELEGRAM: ${{ secrets.TOKEN_TELEGRAM }}
           ID_TELEGRAM: ${{ secrets.ID_TELEGRAM }}
+          ID_TELEGRAM_ADMIN: ${{ secrets.ID_TELEGRAM_ADMIN }}
           BLOG_ID: ${{ secrets.BLOG_ID }}
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
           FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}

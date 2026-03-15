@@ -30,6 +30,7 @@ LINK_TELEGRAM = os.getenv("LINK_TELEGRAM", "https://t.me/LaTerminaldevIcmAr") # 
 # Credenciales para Telegram
 TOKEN_TELEGRAM = os.getenv("TOKEN_TELEGRAM")
 ID_TELEGRAM = os.getenv("ID_TELEGRAM")
+ID_TELEGRAM_ADMIN = os.getenv("ID_TELEGRAM_ADMIN") # 🟢 Tu ID personal para emergencias de Twitter
 BLOG_ID = os.getenv("BLOG_ID")
 
 # Credenciales para Facebook
@@ -47,8 +48,8 @@ TWITTER_ACCESS_SECRET = os.getenv("TWITTER_ACCESS_SECRET")
 if TWITTER_ACCESS_SECRET: TWITTER_ACCESS_SECRET = TWITTER_ACCESS_SECRET.strip()
 
 # Validación rápida de configuración de Telegram
-if ID_TELEGRAM and not ID_TELEGRAM.lstrip('-').isdigit():
-    print(f"⚠️ ALERTA CONFIG: Tu ID_TELEGRAM ('{ID_TELEGRAM}') parece incorrecto. Debe ser NUMÉRICO (sin letras ni @).")
+if ID_TELEGRAM and not (ID_TELEGRAM.lstrip('-').isdigit() or ID_TELEGRAM.startswith('@')):
+    print(f"⚠️ ALERTA CONFIG: Tu ID_TELEGRAM ('{ID_TELEGRAM}') parece incorrecto. Debe ser NUMÉRICO o empezar con '@' para canales.")
     print("   👉 Usa @userinfobot en Telegram para obtener tu número real.")
 
 # 🛡️ Parche de seguridad: Si el entorno (.env local) tiene el modelo viejo, forzamos el nuevo.
@@ -510,6 +511,42 @@ def generar_hilo_noticia(titulo_noticia):
         print(f"⚠️ Error con Groq (Noticia): {e}")
         return None
 
+def generar_post_telegram(datos_mercado):
+    """Genera un análisis exclusivo y profundo para el canal VIP de Telegram."""
+    moneda = datos_mercado['symbol']
+    cambio = f"{float(datos_mercado['percent']):.2f}"
+    rsi = datos_mercado.get('rsi', 50)
+    precio_float = float(datos_mercado['lastPrice'])
+    precio = f"{precio_float:.5f}".rstrip("0").rstrip(".") if precio_float < 1 else f"{precio_float:.2f}"
+    
+    estado_rsi = "Neutro"
+    if rsi > 70: estado_rsi = "🔴 Sobrecompra (Posible retroceso)"
+    elif rsi < 30: estado_rsi = "🟢 Sobreventa (Oportunidad de compra)"
+    
+    info_rsi = f"- RSI (1h): {rsi:.1f} {estado_rsi}" if rsi != 50 else ""
+
+    prompt = f"""
+    Actúa como vIcmAr, administrando tu canal VIP de Telegram 'La Terminal'.
+    
+    DATOS DE MERCADO: {moneda} | Precio: {precio} USDT | Cambio 24h: {cambio}% {info_rsi}
+    
+    OBJETIVO: Escribir un análisis EXCLUSIVO de mercado para los suscriptores de tu canal.
+    Debes aportar más "alfa" (valor técnico, posibles proyecciones o sentimiento) que en un simple Tweet.
+    
+    REGLAS:
+    - Tono: Cercano, de comunidad VIP, "Hacker/Trader".
+    - Formato: Usa HTML básico (<b> para negritas, <i> para énfasis, <code> para métricas clave).
+    - Longitud: 3-4 párrafos fluidos y fáciles de leer. NO hagas testamentos inmensos.
+    - NO pongas enlaces ni menciones redes sociales.
+    """
+    try:
+        print(f"🤖 Generando análisis VIP para Telegram...")
+        chat_completion = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=GROQ_MODEL_NAME, temperature=0.7)
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        print(f"⚠️ Error generando texto Telegram con Groq: {e}")
+        return None
+
 def generar_articulo_blog(datos):
     """
     Genera un artículo educativo y técnico extenso (>500 palabras)
@@ -732,6 +769,10 @@ def obtener_imagen_binance(symbol):
 
 def enviar_telegram_multimedia(mensaje, imagen_url):
     """Envía imagen + texto. Si cabe en caption usa un solo mensaje, si no, envía por separado."""
+    if not imagen_url:
+        enviar_telegram(mensaje)
+        return
+        
     url_photo = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendPhoto"
     
     # 1. Intentar Caption (Límite 1024 chars para captions en Telegram)
@@ -747,6 +788,24 @@ def enviar_telegram_multimedia(mensaje, imagen_url):
         requests.post(url_photo, json={"chat_id": ID_TELEGRAM, "photo": imagen_url}, timeout=10)
     except: pass
     enviar_telegram(mensaje)
+
+def notificar_admin_telegram(mensaje_alerta, img_url=None):
+    """Envía un mensaje directo al administrador (tú) si X falla para que lo subas manual."""
+    if not TOKEN_TELEGRAM or not ID_TELEGRAM_ADMIN:
+        print("⚠️ No hay ID_TELEGRAM_ADMIN configurado. No se puede enviar el Tweet de respaldo.")
+        return
+        
+    print("📲 Enviando Tweet de respaldo a tu Telegram personal...")
+    url_bot = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendMessage"
+    texto = f"🚨 <b>¡Fallo al publicar en X (Twitter)!</b>\n\nCopia este texto (toca para copiar) y súbelo manual a tu cuenta:\n\n<code>{mensaje_alerta}</code>"
+    if img_url:
+        texto += f"\n\n🖼️ Imagen: <a href='{img_url}'>Descargar aquí</a>"
+        
+    payload = {"chat_id": ID_TELEGRAM_ADMIN, "text": texto, "parse_mode": "HTML"}
+    try:
+        requests.post(url_bot, json=payload, timeout=10)
+    except Exception as e:
+        print(f"⚠️ Error enviando respaldo a admin: {e}")
 
 def publicar_en_blogger(titulo, contenido, etiquetas, img_url=None):
     """Publica el artículo en Blogger usando la API de Google."""
@@ -820,6 +879,7 @@ def publicar_en_twitter(mensaje, img_url=None):
         
     if not all([TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET]):
         print("⚠️ X (Twitter): Credenciales incompletas. Se omite.")
+        notificar_admin_telegram(mensaje, img_url) # Enviar por Telegram en caso de fallo
         return False
         
     print("📡 Enviando publicación a X (Twitter)...")
@@ -865,9 +925,11 @@ def publicar_en_twitter(mensaje, img_url=None):
                 time.sleep(5)
             else:
                 print(f"❌ Error publicando en X (Twitter): {type(e).__name__} - {e}")
+                notificar_admin_telegram(mensaje, img_url)
                 return False
                 
     print("❌ Se agotaron los reintentos para publicar en X por fallo del servidor.")
+    notificar_admin_telegram(mensaje, img_url)
     return False
 
 def publicar_en_facebook(mensaje, img_url=None):
@@ -1100,6 +1162,14 @@ if __name__ == "__main__":
                 publicar_en_twitter(post_square, img_url) # El post corto también va a X
                 guardar_historial(oportunidad['symbol']) # Opcional: Para evitar repetir si fallara algo externo
                 
+                # --- POST EXCLUSIVO CANAL VIP TELEGRAM ---
+                print("📝 Generando post exclusivo para el canal VIP de Telegram...")
+                post_telegram = generar_post_telegram(oportunidad)
+                if post_telegram:
+                    enlace_trade = f"https://www.binance.com/es/trade/{oportunidad['symbol']}_USDT"
+                    mensaje_tg = f"💎 <b>¡REPORTE VIP DE LA TERMINAL!</b> 💎\n\n{post_telegram}\n\n👉 <a href='{enlace_trade}'>Operar {oportunidad['symbol']} en Binance</a>"
+                    enviar_telegram_multimedia(mensaje_tg, img_url)
+                
                 # Generar Artículo Blog Extenso
                 articulo_blog = generar_articulo_blog(oportunidad)
                 
@@ -1121,15 +1191,6 @@ if __name__ == "__main__":
                     # Preparamos los hashtags en texto plano para usarlos en Telegram y Facebook
                     tags_str = " ".join(hashtags_unicos)
 
-                    # Solo enviar reporte de texto a las 09:00 UTC (6 AM Arg) y 22:00 UTC (7 PM Arg)
-                    if hora_actual in [9, 22]:
-                        print("⏰ Hora de reporte. Enviando mensaje único a Telegram...")
-                        
-                        mensaje_completo = f"📌 {titulo_blog}\n\n{texto_limpio}\n\n{tags_str}"
-                        enviar_telegram(mensaje_completo)
-                    else:
-                        print(f"🔇 Telegram silenciado. (Hora actual UTC: {hora_actual}. Solo envía a las 9 y 22 UTC).")
-                    
                     # 5. Publicar en Blogger
                     publicar_en_blogger(titulo_blog, texto_limpio, hashtags_unicos, img_url)
                     
@@ -1138,5 +1199,4 @@ if __name__ == "__main__":
                     texto_fb = re.sub(r'<[^>]+>', '', texto_limpio)
                     publicar_en_facebook(f"📌 {titulo_blog}\n\n{texto_fb}\n\n💬 Únete a mi canal VIP de Telegram para más alertas: {LINK_TELEGRAM}\n\n{tags_str}", img_url)
                 else:
-                    if hora_actual in [9, 22]:
-                        enviar_telegram("⚠️ No se pudo generar el artículo de blog, pero el post de Square está activo.")
+                    print("⚠️ No se pudo generar el artículo de blog, pero Telegram y Square están activos.")
