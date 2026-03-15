@@ -36,9 +36,13 @@ FB_ACCESS_TOKEN = os.getenv("FB_ACCESS_TOKEN")
 
 # Credenciales para X (Twitter)
 TWITTER_API_KEY = os.getenv("TWITTER_API_KEY")
+if TWITTER_API_KEY: TWITTER_API_KEY = TWITTER_API_KEY.strip()
 TWITTER_API_SECRET = os.getenv("TWITTER_API_SECRET")
+if TWITTER_API_SECRET: TWITTER_API_SECRET = TWITTER_API_SECRET.strip()
 TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
+if TWITTER_ACCESS_TOKEN: TWITTER_ACCESS_TOKEN = TWITTER_ACCESS_TOKEN.strip()
 TWITTER_ACCESS_SECRET = os.getenv("TWITTER_ACCESS_SECRET")
+if TWITTER_ACCESS_SECRET: TWITTER_ACCESS_SECRET = TWITTER_ACCESS_SECRET.strip()
 
 # Validación rápida de configuración de Telegram
 if ID_TELEGRAM and not ID_TELEGRAM.lstrip('-').isdigit():
@@ -761,17 +765,28 @@ def publicar_en_twitter(mensaje):
         return False
         
     print("📡 Enviando publicación a X (Twitter)...")
-    try:
-        client_tw = tweepy.Client(
-            consumer_key=TWITTER_API_KEY, consumer_secret=TWITTER_API_SECRET,
-            access_token=TWITTER_ACCESS_TOKEN, access_token_secret=TWITTER_ACCESS_SECRET
-        )
-        response = client_tw.create_tweet(text=mensaje)
-        print(f"✅ ¡PUBLICADO EN X! ID del Tweet: {response.data['id']}")
-        return True
-    except Exception as e:
-        print(f"❌ Error publicando en X (Twitter): {e}")
-        return False
+    client_tw = tweepy.Client(
+        consumer_key=TWITTER_API_KEY, consumer_secret=TWITTER_API_SECRET,
+        access_token=TWITTER_ACCESS_TOKEN, access_token_secret=TWITTER_ACCESS_SECRET
+    )
+    
+    for intento in range(3):
+        try:
+            response = client_tw.create_tweet(text=mensaje)
+            print(f"✅ ¡PUBLICADO EN X! ID del Tweet: {response.data['id']}")
+            return True
+        except Exception as e:
+            error_msg = str(e)
+            # Si es un error temporal del servidor (503, 500, etc), reintentamos
+            if "503" in error_msg or "Service Unavailable" in error_msg or "500" in error_msg or "502" in error_msg:
+                print(f"⚠️ Los servidores de X están saturados (Error 50x). Reintento {intento + 1}/3 en 5 segundos...")
+                time.sleep(5)
+            else:
+                print(f"❌ Error publicando en X (Twitter): {type(e).__name__} - {e}")
+                return False
+                
+    print("❌ Se agotaron los reintentos para publicar en X por fallo del servidor.")
+    return False
 
 def publicar_en_facebook(mensaje, img_url=None):
     """Publica en la página de Facebook usando Graph API."""
