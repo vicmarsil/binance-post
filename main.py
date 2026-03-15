@@ -11,6 +11,8 @@ import time
 import random
 from datetime import datetime, timedelta, timezone
 import urllib.parse
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 
 # --- CONFIGURACIÓN Y VARIABLES DE ENTORNO ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -24,6 +26,7 @@ TIPO_BOT = os.getenv("TIPO_BOT", "TENDENCIA") # 🟢 Nuevo: Selecciona el modo d
 # Credenciales para Telegram
 TOKEN_TELEGRAM = os.getenv("TOKEN_TELEGRAM")
 ID_TELEGRAM = os.getenv("ID_TELEGRAM")
+BLOG_ID = os.getenv("BLOG_ID")
 
 # Validación rápida de configuración de Telegram
 if ID_TELEGRAM and not ID_TELEGRAM.lstrip('-').isdigit():
@@ -589,6 +592,44 @@ def enviar_telegram_multimedia(mensaje, imagen_url):
     except: pass
     enviar_telegram(mensaje)
 
+def publicar_en_blogger(titulo, contenido, etiquetas):
+    """Publica el artículo en Blogger usando la API de Google."""
+    if MODO_PRUEBA:
+        print(f"\n🧪 [MODO PRUEBA] Simulación de envío a Blogger:")
+        print(f"Título: {titulo}")
+        return True
+
+    if not BLOG_ID:
+        print("⚠️ BLOG_ID no configurado. Omitiendo publicación en Blogger.")
+        return False
+
+    if not os.path.exists('token.json'):
+        print("❌ Error: Archivo 'token.json' no encontrado. Ejecuta auth_blogger.py primero.")
+        return False
+
+    try:
+        # Cargar credenciales desde el archivo token.json
+        creds = Credentials.from_authorized_user_file('token.json', ['https://www.googleapis.com/auth/blogger'])
+        service = build('blogger', 'v3', credentials=creds)
+        
+        # Las etiquetas en Blogger no llevan el símbolo '#'
+        etiquetas_limpias = [tag.replace('#', '') for tag in etiquetas]
+        
+        post_body = {
+            'title': titulo,
+            'content': contenido.replace('\n', '<br>'), # Convertir saltos de línea a HTML para Blogger
+            'labels': etiquetas_limpias
+        }
+        
+        print("📡 Enviando artículo a Blogger...")
+        request = service.posts().insert(blogId=BLOG_ID, body=post_body, isDraft=False)
+        response = request.execute()
+        print(f"✅ ¡PUBLICADO EN BLOGGER! URL: {response.get('url')}")
+        return True
+    except Exception as e:
+        print(f"⚠️ Error al publicar en Blogger: {e}")
+        return False
+
 def enviar_telegram(mensaje):
     """
     Envía el mensaje formateado a Telegram. Divide mensajes largos si es necesario.
@@ -724,6 +765,9 @@ if __name__ == "__main__":
                         enviar_telegram(mensaje_completo)
                     else:
                         print(f"🔇 Telegram silenciado. (Hora actual UTC: {hora_actual}. Solo envía a las 9 y 22 UTC).")
+                    
+                    # 5. Publicar en Blogger
+                    publicar_en_blogger(titulo_blog, texto_limpio, hashtags_unicos)
                 else:
                     if hora_actual in [9, 22]:
                         enviar_telegram("⚠️ No se pudo generar el artículo de blog, pero el post de Square está activo.")
