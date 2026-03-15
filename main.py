@@ -9,6 +9,7 @@ from groq import Groq
 import json
 import time
 import random
+import tempfile
 from datetime import datetime, timedelta, timezone
 import urllib.parse
 from google.oauth2.credentials import Credentials # type: ignore
@@ -24,6 +25,7 @@ MODO_PRUEBA = os.getenv("MODO_PRUEBA", "False").lower() == "true" # 🟢 Configu
 GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama-3.3-70b-versatile").strip() # .strip() elimina espacios fantasma
 TIPO_BOT = os.getenv("TIPO_BOT", "TENDENCIA") # 🟢 Nuevo: Selecciona el modo de operación
 REFERIDO_BITGET = os.getenv("REFERIDO_BITGET", "https://web3.bitget.com/share/1sEleg?inviteCode=vicmarsil18") # 🟢 Tu link de embajador
+LINK_TELEGRAM = os.getenv("LINK_TELEGRAM", "https://t.me/LaTerminaldevIcmAr") # 🟢 Tu canal para atraer tráfico
 
 # Credenciales para Telegram
 TOKEN_TELEGRAM = os.getenv("TOKEN_TELEGRAM")
@@ -58,8 +60,13 @@ if "llama3-8b-8192" in GROQ_MODEL_NAME:
 ARCHIVO_HISTORIAL = "historial.json"
 
 # --- LISTA DE MONEDAS A ANALIZAR (MAJORS & ALTA LIQUIDEZ) ---
-MONEDAS_ANALISIS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 
-                    'ADAUSDT', 'AVAXUSDT', 'TRXUSDT', 'LINKUSDT', 'DOTUSDT', 'MATICUSDT']
+MONEDAS_ANALISIS = [
+    'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 
+    'ADAUSDT', 'AVAXUSDT', 'TRXUSDT', 'LINKUSDT', 'DOTUSDT', 'MATICUSDT',
+    'DOGEUSDT', 'SHIBUSDT', 'PEPEUSDT', 'WIFUSDT', # Memecoins populares
+    'SUIUSDT', 'APTUSDT', 'ARBUSDT', 'OPUSDT', 'NEARUSDT', 'TIAUSDT', # Layer 1 y 2
+    'INJUSDT', 'FETUSDT', 'RNDRUSDT' # Inteligencia Artificial
+]
 
 # Mapeo para CoinGecko (Backup si Binance falla)
 COINGECKO_IDS = {
@@ -73,7 +80,20 @@ COINGECKO_IDS = {
     'TRXUSDT': 'tron',
     'LINKUSDT': 'chainlink',
     'DOTUSDT': 'polkadot',
-    'MATICUSDT': 'matic-network'
+    'MATICUSDT': 'matic-network',
+    'DOGEUSDT': 'dogecoin',
+    'SHIBUSDT': 'shiba-inu',
+    'PEPEUSDT': 'pepe',
+    'WIFUSDT': 'dogwifcoin',
+    'SUIUSDT': 'sui',
+    'APTUSDT': 'aptos',
+    'ARBUSDT': 'arbitrum',
+    'OPUSDT': 'optimism',
+    'NEARUSDT': 'near',
+    'TIAUSDT': 'celestia',
+    'INJUSDT': 'injective-protocol',
+    'FETUSDT': 'fetch-ai',
+    'RNDRUSDT': 'render-token'
 }
 
 # Validación básica de seguridad
@@ -299,6 +319,7 @@ def generar_post_inteligente(datos_mercado):
     - 🧠 VALOR AGREGADO: Es fundamental que incluyas una curiosidad o aspecto técnico real de la red/ecosistema de {moneda}.
     - 📊 INTEGRACIÓN: {instruccion_datos} Hazlo de forma conversacional.
     - 👇 ENGAGEMENT: Termina con una pregunta fresca acorde al contexto, nunca repitas el típico "te leo en comentarios".
+    - 🎯 ETIQUETAS: OBLIGATORIO mencionar a @BinanceES al final del tweet.
     
     REGLAS:
     - Máximo 260 caracteres ESTRICTO (para que quepa en un Tweet).
@@ -452,6 +473,43 @@ def generar_post_rsi(datos):
         print(f"⚠️ Error generando texto RSI: {e}")
         return None
 
+def buscar_anuncios_binance():
+    """Busca nuevos Launchpools o listados en Binance."""
+    print("🔍 Buscando nuevos anuncios de Launchpool/Listados en Binance...")
+    try:
+        url = "https://www.binance.com/bapi/composite/v1/public/cms/article/catalog/list/query?catalogId=54&pageNo=1&pageSize=3"
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get('success') and data.get('data') and data['data'].get('articles'):
+                return data['data']['articles'][0] # El más reciente
+    except Exception as e:
+        print(f"⚠️ Error buscando noticias: {e}")
+    return None
+
+def generar_hilo_noticia(titulo_noticia):
+    prompt = f"""
+    Actúa como un experto en criptomonedas en Twitter.
+    Binance acaba de anunciar: "{titulo_noticia}"
+    
+    TAREA: Escribe un tweet de ALERTA sobre este anuncio para generar mucha interacción.
+    
+    REGLAS:
+    - OBLIGATORIO: Etiqueta a @BinanceES.
+    - Usa emojis de sirena 🚨 o fuego 🔥.
+    - Máximo 260 caracteres ESTRICTO.
+    """
+    try:
+        print("🤖 Generando Tweet de noticia de Binance...")
+        chat_completion = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=GROQ_MODEL_NAME, temperature=0.7)
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        print(f"⚠️ Error con Groq (Noticia): {e}")
+        return None
+
 def generar_articulo_blog(datos):
     """
     Genera un artículo educativo y técnico extenso (>500 palabras)
@@ -554,7 +612,7 @@ def generar_tweet_bitget(referido):
     - Máximo 260 caracteres EN TOTAL.
     - NO saludes. Ve directo al grano.
     - Usa 1 o 2 emojis.
-    - Incluye hashtags #Web3 #Bitget
+    - OBLIGATORIO: Menciona a @BitgetES y @BitgetWallet y usa hashtags #Web3 #Bitget
     """
     try:
         print("✍️ Redactando Tweet promocional de Bitget...")
@@ -754,8 +812,8 @@ def publicar_en_blogger(titulo, contenido, etiquetas, img_url=None):
         print(f"⚠️ Error al publicar en Blogger: {e}")
         return False
 
-def publicar_en_twitter(mensaje):
-    """Publica un tweet usando la API v2 de X (Twitter)."""
+def publicar_en_twitter(mensaje, img_url=None):
+    """Publica un tweet usando la API v2 de X (Twitter) y adjunta imagen si se provee."""
     if MODO_PRUEBA:
         print(f"\n🧪 [MODO PRUEBA] Simulación de envío a X (Twitter):\n{mensaje}")
         return True
@@ -770,9 +828,33 @@ def publicar_en_twitter(mensaje):
         access_token=TWITTER_ACCESS_TOKEN, access_token_secret=TWITTER_ACCESS_SECRET
     )
     
+    media_ids = None
+    if img_url:
+        try:
+            # Tweepy v1.1 es necesario para subir imágenes (Soportado en Free Tier)
+            auth = tweepy.OAuth1UserHandler(TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET)
+            api_v1 = tweepy.API(auth)
+            
+            print("🖼️ Descargando imagen para X (Twitter)...")
+            r = requests.get(img_url, timeout=15)
+            if r.status_code == 200:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
+                    tmp_file.write(r.content)
+                    tmp_path = tmp_file.name
+                
+                print("🖼️ Subiendo imagen a los servidores de X...")
+                media = api_v1.media_upload(tmp_path)
+                media_ids = [media.media_id]
+                os.remove(tmp_path)
+        except Exception as e:
+            print(f"⚠️ Error adjuntando imagen en X: {e}. Se publicará solo texto.")
+
     for intento in range(3):
         try:
-            response = client_tw.create_tweet(text=mensaje)
+            if media_ids:
+                response = client_tw.create_tweet(text=mensaje, media_ids=media_ids)
+            else:
+                response = client_tw.create_tweet(text=mensaje)
             print(f"✅ ¡PUBLICADO EN X! ID del Tweet: {response.data['id']}")
             return True
         except Exception as e:
@@ -942,8 +1024,8 @@ if __name__ == "__main__":
             
             print("📝 Publicando promoción de Bitget en Facebook...")
             texto_fb = re.sub(r'<[^>]+>', '', texto_limpio)
-            # Añadimos el link explícito en Facebook
-            publicar_en_facebook(f"📌 {titulo}\n\n{texto_fb}\n\n🔗 Únete a Bitget aquí: {REFERIDO_BITGET}\n\n{tags_str}", img_url)
+            # Añadimos el link explícito en Facebook y el CTA de Telegram
+            publicar_en_facebook(f"📌 {titulo}\n\n{texto_fb}\n\n🔗 Únete a Bitget aquí: {REFERIDO_BITGET}\n\n💬 Únete a mi canal VIP de Telegram gratis: {LINK_TELEGRAM}\n\n{tags_str}", img_url)
             
             print("📝 Enviando promoción a Telegram...")
             mensaje_tg = f"📌 <b>{titulo}</b>\n\n{texto_limpio}\n\n🔗 <a href='{REFERIDO_BITGET}'>Solicita tu Bitget Card Aquí</a>\n\n{tags_str}"
@@ -952,9 +1034,36 @@ if __name__ == "__main__":
             print("📝 Publicando promoción de Bitget en X (Twitter)...")
             tweet_bitget = generar_tweet_bitget(REFERIDO_BITGET)
             if tweet_bitget:
-                publicar_en_twitter(tweet_bitget)
+                publicar_en_twitter(tweet_bitget, img_url)
             
         # IMPORTANTE: NO PUBLICAMOS EN BINANCE SQUARE para evitar baneos.
+
+    elif TIPO_BOT == "LAUNCHPOOL":
+        # --- MODO CAZADOR DE NOTICIAS ---
+        print("🚀 Iniciando modo Cazador de Launchpools...")
+        noticia = buscar_anuncios_binance()
+        
+        if noticia:
+            codigo = noticia['code']
+            titulo = noticia['title']
+            historial = cargar_historial()
+            
+            # Verificamos si ya publicamos sobre este anuncio usando su código único
+            if codigo in historial:
+                print("😴 No hay anuncios nuevos en Binance Launchpool/Listing.")
+            else:
+                print(f"🚨 ¡NUEVO ANUNCIO DETECTADO!: {titulo}")
+                tweet = generar_hilo_noticia(titulo)
+                link_noticia = f"https://www.binance.com/en/support/announcement/{codigo}"
+                
+                if tweet:
+                    tweet_final = f"{tweet}\n\n👉 Lee más aquí: {link_noticia}\n💬 VIP: {LINK_TELEGRAM}"
+                    publicar_en_twitter(tweet_final) # Se publica como breaking news en X
+                    
+                    msg_tg = f"🚨 <b>¡ALERTA DE BINANCE!</b> 🚨\n\n{titulo}\n\n🔗 <a href='{link_noticia}'>Leer Anuncio Oficial</a>\n\n💬 <a href='{LINK_TELEGRAM}'>Únete al VIP aquí</a>"
+                    enviar_telegram(msg_tg)
+                    
+                    guardar_historial(codigo)
 
     else:
         # --- MODO REPORTE DIARIO (Matutino/Vespertino) ---
@@ -985,12 +1094,14 @@ if __name__ == "__main__":
             # Publicar en Square
             if post_square and publicar_en_square(post_square):
                 print(f"✅ Publicado en Square. Procediendo a Blog/Telegram...")
-                publicar_en_twitter(post_square) # El post corto también va a X
+                # Obtenemos la imagen antes de X para poder adjuntarla
+                img_url = obtener_imagen_binance(oportunidad['symbol'])
+                
+                publicar_en_twitter(post_square, img_url) # El post corto también va a X
                 guardar_historial(oportunidad['symbol']) # Opcional: Para evitar repetir si fallara algo externo
                 
                 # Generar Artículo Blog Extenso
                 articulo_blog = generar_articulo_blog(oportunidad)
-                img_url = obtener_imagen_binance(oportunidad['symbol'])
                 
                 if articulo_blog:
                     articulo_blog = articulo_blog.strip()
@@ -1025,7 +1136,7 @@ if __name__ == "__main__":
                     # 6. Publicar en Facebook (Sin etiquetas HTML + Imagen)
                     # Facebook no soporta HTML, así que borramos las etiquetas (<b>, <i>, <code>)
                     texto_fb = re.sub(r'<[^>]+>', '', texto_limpio)
-                    publicar_en_facebook(f"📌 {titulo_blog}\n\n{texto_fb}\n\n{tags_str}", img_url)
+                    publicar_en_facebook(f"📌 {titulo_blog}\n\n{texto_fb}\n\n💬 Únete a mi canal VIP de Telegram para más alertas: {LINK_TELEGRAM}\n\n{tags_str}", img_url)
                 else:
                     if hora_actual in [9, 22]:
                         enviar_telegram("⚠️ No se pudo generar el artículo de blog, pero el post de Square está activo.")

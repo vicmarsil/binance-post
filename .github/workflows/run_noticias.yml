@@ -1,0 +1,52 @@
+name: Cazador de Launchpool
+
+on:
+  schedule:
+    - cron: '30 */2 * * *'  # Revisa la web de Binance cada 2 horas y media
+  workflow_dispatch:      # Permite probarlo manualmente
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: |
+          pip install requests groq python-dotenv selenium webdriver-manager google-api-python-client google-auth-httplib2 google-auth-oauthlib tweepy
+
+      - name: Ejecutar Rastreador
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          MODO_PRUEBA: 'False'
+          GROQ_MODEL_NAME: "llama-3.3-70b-versatile"
+          TIPO_BOT: "LAUNCHPOOL"  # 👈 Activa el modo de noticias extremas
+          TOKEN_TELEGRAM: ${{ secrets.TOKEN_TELEGRAM }}
+          ID_TELEGRAM: ${{ secrets.ID_TELEGRAM }}
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
+        run: python main.py
+
+      - name: Guardar base de datos (Historial de noticias)
+        run: |
+          git config --global user.name 'GitHub Actions Bot'
+          git config --global user.email 'actions@github.com'
+          cp historial.json historial_temp.json || true
+          git checkout -- historial.json || true
+          git pull origin main --rebase || true
+          mv historial_temp.json historial.json || true
+          git add historial.json
+          git commit -m "💾 Actualizar historial de Launchpools" || echo "⚠️ No hubo cambios para guardar"
+          git push origin main || echo "⚠️ Falló el push (posible colisión exacta), se ignorará."
