@@ -22,6 +22,7 @@ if SQUARE_API_KEY:
 MODO_PRUEBA = os.getenv("MODO_PRUEBA", "False").lower() == "true" # 🟢 Configurable. Por defecto False (Producción).
 GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama-3.3-70b-versatile").strip() # .strip() elimina espacios fantasma
 TIPO_BOT = os.getenv("TIPO_BOT", "TENDENCIA") # 🟢 Nuevo: Selecciona el modo de operación
+REFERIDO_BITGET = os.getenv("REFERIDO_BITGET", "TU_LINK_AQUI") # 🟢 Tu link de embajador
 
 # Credenciales para Telegram
 TOKEN_TELEGRAM = os.getenv("TOKEN_TELEGRAM")
@@ -450,8 +451,16 @@ def generar_articulo_blog(datos):
     rsi = datos.get('rsi', 'N/A')
     cambio = datos.get('percent', 'N/A')
     
+    enfoques_blog = [
+        "Start by discussing the broader macroeconomic sentiment or general crypto market volatility, then drill down into this specific coin.",
+        "Begin with a reflection on trading psychology or technical analysis principles, connecting it to the current RSI and price action.",
+        "Dive straight into the fundamentals, news, use cases, or technology behind this specific coin, then support your thesis with the technical data provided.",
+        "Use an 'early warning' tone, discussing why these specific price levels and RSI could be pivotal for the upcoming weeks."
+    ]
+    enfoque = random.choice(enfoques_blog)
+
     prompt = f"""
-    Act as vIcmAr, an automated Python trading bot running on cloud servers but with an "Argentine soul".
+    Act as vIcmAr, a passionate crypto programmer and market analyst from Argentina.
     
     TASK: Write a technical and educational blog article for Publish0x.
     TOPIC: Deep technical analysis of {symbol}.
@@ -460,22 +469,19 @@ def generar_articulo_blog(datos):
     LANGUAGE: ENGLISH. The entire content MUST be in English.
     
     WRITING STYLE (IMPORTANT):
-    - Tone: "Diary of a Crypto Programmer". Use first person.
-    - Phrase ideas: "From my terminal in Argentina...", "Analyzing my script logs...", "The algorithm detected...".
-    - Focus: Technical but explanatory. Explain concepts like RSI or volume while analyzing.
-    - DO NOT use generic AI phrases like "In today's digital world". Be raw, direct, and 'geeky'.
+    - Tone: Human, insightful, and professional but approachable. Use first person.
+    - 🚫 AVOID REPETITION: DO NOT always introduce yourself. DO NOT use clichés like "From my terminal in Argentina..." or "In the ever-evolving world of crypto". Jump straight into delivering value.
+    - FOCUS FOR THIS POST: {enfoque}
+    - Explain concepts: If you mention RSI or momentum, briefly explain what it implies for {symbol} right now.
     - FORMAT: Use simple HTML compatible with Telegram: <b> for bold/titles, <i> for emphasis, and <code> for terminal variables. DO NOT USE MARKDOWN (** or __).
-    - Use emojis to make the text visually engaging and less dense.
+    - Use emojis to make the text visually engaging.
     
     STRUCTURE (HTML):
     1. FIRST LINE: Only the raw Main Title (Catchy, NO HTML tags on the first line).
-    2. <b>INTRODUCTION</b>: The first paragraph must briefly introduce the vIcmAr automation project.
-    3. <b>📟 Console Discovery</b> (Context)
-    4. <b>⚙️ Data Analysis</b> (Price and RSI breakdown)
-    5. <b>🔮 Code Projection</b> (Conclusion)
+    2. The rest of the article must be fluid paragraphs. Use creative <b>Subtitles</b> when transitioning topics, but DO NOT use the same generic subheadings every time. Make it read like a real human analyst's article.
     6. TAGS: At the very end, generate a list of 5 recommended tags (e.g., #Bitcoin #Trading #AI #RSI #{symbol}).
     
-    Length: Minimum 500 words.
+    Length: Minimum 400 words.
     """
     
     try:
@@ -488,6 +494,42 @@ def generar_articulo_blog(datos):
         return chat_completion.choices[0].message.content
     except Exception as e:
         print(f"⚠️ Error generando artículo blog: {e}")
+        return None
+
+def generar_articulo_bitget(referido):
+    """Genera un artículo promocional diario de Bitget Wallet con enfoques aleatorios."""
+    enfoques = [
+        "Céntrate en la nueva Tarjeta Cripto (Bitget Card) y cómo facilita gastar saldo Web3 en compras diarias físicas o virtuales.",
+        "Escribe sobre la seguridad, custodia descentralizada y las ventajas de usar Bitget Wallet frente a exchanges centralizados.",
+        "Habla sobre la caza de Airdrops, los beneficios del token BWB y cómo la app ayuda a descubrir nuevas gemas en DeFi.",
+        "Haz un tutorial conceptual sobre cómo dar los primeros pasos en DeFi de forma fácil usando Bitget Wallet."
+    ]
+    enfoque = random.choice(enfoques)
+    
+    prompt = f"""
+    Actúa como vIcmAr, un educador apasionado por DeFi y Web3.
+    
+    TAREA: Escribir un post de blog natural y atractivo para promocionar 'Bitget Wallet' y su tarjeta cripto.
+    ENFOQUE DE HOY: {enfoque}
+    
+    IDIOMA: Español.
+    
+    REGLAS ESTRICTAS:
+    - Tono: Educativo, humano y entusiasta. NO suenes como un anuncio de teletienda ni hagas spam barato. Aporta valor real.
+    - Enlace: Debes integrar de forma fluida y natural este enlace de referido en el texto invitando a unirse: {referido}
+    - Formato HTML: Usa <b> para subtítulos o texto clave, <i> para énfasis. Párrafos fluidos. NO uses listas 1. 2. 3.
+    - Estructura: 
+      1. PRIMERA LÍNEA: Solo el título principal atractivo (SIN etiquetas HTML).
+      2. El resto del post.
+      3. Al final, añade 5 etiquetas (ej: #BitgetWallet #Web3 #CryptoCard).
+    - Extensión mínima: 350 palabras.
+    """
+    try:
+        print("✍️ Redactando artículo promocional de Bitget...")
+        chat_completion = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=GROQ_MODEL_NAME, temperature=0.7)
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        print(f"⚠️ Error en Groq con Bitget: {e}")
         return None
 
 def publicar_en_square(contenido):
