@@ -818,11 +818,13 @@ if __name__ == "__main__":
                     texto_limpio = re.sub(r'#\w+', '', contenido_blog).strip()
                     texto_limpio = re.sub(r'(?i)\bTAGS:\s*', '', texto_limpio).strip()
 
+                    # Preparamos los hashtags en texto plano para usarlos en Telegram y Facebook
+                    tags_str = " ".join(hashtags_unicos)
+
                     # Solo enviar reporte de texto a las 09:00 UTC (6 AM Arg) y 22:00 UTC (7 PM Arg)
                     if hora_actual in [9, 22]:
                         print("⏰ Hora de reporte. Enviando mensaje único a Telegram...")
                         
-                        tags_str = " ".join(hashtags_unicos)
                         mensaje_completo = f"📌 {titulo_blog}\n\n{texto_limpio}\n\n{tags_str}"
                         enviar_telegram(mensaje_completo)
                     else:
