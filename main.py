@@ -623,6 +623,7 @@ def generar_articulo_bitget(referido):
     REGLAS ESTRICTAS:
     - Tono: Educativo, humano y entusiasta. NO suenes como un anuncio de teletienda ni hagas spam barato. Aporta valor real.
     - Enlace: OBLIGATORIO integrar el referido usando formato HTML: <a href="{referido}">Únete a Bitget aquí</a>. NUNCA pongas la URL en texto plano.
+    - Llamada a la acción: Al final del artículo, antes de las etiquetas, añade un párrafo invitando a tu canal de Telegram con este enlace: <a href="{LINK_TELEGRAM}">Únete a mi canal VIP de Telegram aquí</a>.
     - Formato HTML: Usa <b> para subtítulos, <i> para énfasis y <a> para el enlace. Párrafos fluidos. NO uses listas 1. 2. 3.
     - Estructura: 
       1. PRIMERA LÍNEA: Solo el título principal atractivo (SIN etiquetas HTML).
@@ -650,6 +651,7 @@ def generar_tweet_bitget(referido):
     - NO saludes. Ve directo al grano.
     - Usa 1 o 2 emojis.
     - OBLIGATORIO: Menciona a @BitgetES y @BitgetWallet y usa hashtags #Web3 #Bitget
+    - Al final, añade una línea nueva con el enlace a tu canal de Telegram: "💬 VIP gratis: {LINK_TELEGRAM}"
     """
     try:
         print("✍️ Redactando Tweet promocional de Bitget...")
@@ -1101,7 +1103,7 @@ if __name__ == "__main__":
             publicar_en_facebook(f"📌 {titulo}\n\n{texto_fb}\n\n🔗 Únete a Bitget aquí: {REFERIDO_BITGET}\n\n💬 Únete a mi canal VIP de Telegram gratis: {LINK_TELEGRAM}\n\n{tags_str}", img_url)
             
             print("📝 Enviando promoción a Telegram...")
-            mensaje_tg = f"📌 <b>{titulo}</b>\n\n{texto_limpio}\n\n🔗 <a href='{REFERIDO_BITGET}'>Solicita tu Bitget Card Aquí</a>\n\n{tags_str}"
+            mensaje_tg = f"📌 <b>{titulo}</b>\n\n{texto_limpio}\n\n🔗 <a href='{REFERIDO_BITGET}'>Solicita tu Bitget Card Aquí</a>\n\n <a href='{LINK_TELEGRAM}'>Únete al canal VIP para más análisis</a>\n\n{tags_str}"
             enviar_telegram(mensaje_tg)
             
             print("📝 Publicando promoción de Bitget en X (Twitter)...")
@@ -1169,8 +1171,10 @@ if __name__ == "__main__":
                 print(f"✅ Publicado en Square. Procediendo a Blog/Telegram...")
                 # Obtenemos la imagen antes de X para poder adjuntarla
                 img_url = obtener_imagen_binance(oportunidad['symbol'])
-                
-                publicar_en_twitter(post_square, img_url) # El post corto también va a X
+
+                # Modificamos el post para X (Twitter) añadiendo el enlace al canal
+                post_twitter = f"{post_square}\n\n💬 Canal VIP gratis para más análisis: {LINK_TELEGRAM}"
+                publicar_en_twitter(post_twitter, img_url)
                 guardar_historial(oportunidad['symbol']) # Opcional: Para evitar repetir si fallara algo externo
                 
                 # --- POST EXCLUSIVO CANAL VIP TELEGRAM ---
@@ -1178,7 +1182,7 @@ if __name__ == "__main__":
                 post_telegram = generar_post_telegram(oportunidad)
                 if post_telegram:
                     enlace_trade = f"https://www.binance.com/es/trade/{oportunidad['symbol']}_USDT"
-                    mensaje_tg = f"💎 <b>¡REPORTE VIP DE LA TERMINAL!</b> 💎\n\n{post_telegram}\n\n👉 <a href='{enlace_trade}'>Operar {oportunidad['symbol']} en Binance</a>"
+                    mensaje_tg = f"💎 <b>¡REPORTE VIP DE LA TERMINAL!</b> 💎\n\n{post_telegram}\n\n👉 <a href='{enlace_trade}'>Operar {oportunidad['symbol']} en Binance</a>\n\n💬 <a href='{LINK_TELEGRAM}'>Únete aquí para más reportes VIP</a>"
                     enviar_telegram_multimedia(mensaje_tg, img_url)
                 
                 # Generar Artículo Blog Extenso
