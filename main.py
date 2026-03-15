@@ -812,6 +812,40 @@ if __name__ == "__main__":
                 publicar_en_square(post)
                 # Nota: No guardamos historial para F&G porque es un post diario único.
     
+    elif TIPO_BOT == "BITGET":
+        # --- MODO PROMOCIÓN BITGET WALLET ---
+        print("🚀 Iniciando modo Promoción Bitget Wallet...")
+        articulo = generar_articulo_bitget(REFERIDO_BITGET)
+        
+        if articulo:
+            articulo = articulo.strip()
+            lineas = articulo.split('\n')
+            titulo = lineas[0].replace('#', '').strip()
+            contenido = "\n".join(lineas[1:]).strip()
+            
+            import re
+            hashtags = re.findall(r'#\w+', contenido)
+            hashtags_unicos = list(dict.fromkeys(hashtags))
+            texto_limpio = re.sub(r'#\w+', '', contenido).strip()
+            tags_str = " ".join(hashtags_unicos)
+            
+            # Generamos una imagen IA relacionada con pagos cripto y Web3
+            img_url = generar_imagen_ia("Bitget Wallet", "futuristic digital wallet floating credit card cyberpunk neon web3 payment")
+            
+            print("📝 Publicando promoción de Bitget en Blogger...")
+            publicar_en_blogger(titulo, texto_limpio, hashtags_unicos, img_url)
+            
+            print("📝 Publicando promoción de Bitget en Facebook...")
+            texto_fb = re.sub(r'<[^>]+>', '', texto_limpio)
+            # Añadimos el link explícito en Facebook
+            publicar_en_facebook(f"📌 {titulo}\n\n{texto_fb}\n\n🔗 Únete a Bitget aquí: {REFERIDO_BITGET}\n\n{tags_str}", img_url)
+            
+            print("📝 Enviando promoción a Telegram...")
+            mensaje_tg = f"📌 <b>{titulo}</b>\n\n{texto_limpio}\n\n🔗 <a href='{REFERIDO_BITGET}'>Solicita tu Bitget Card Aquí</a>\n\n{tags_str}"
+            enviar_telegram(mensaje_tg)
+            
+        # IMPORTANTE: NO PUBLICAMOS EN BINANCE SQUARE para evitar baneos.
+
     else:
         # --- MODO REPORTE DIARIO (Matutino/Vespertino) ---
         
