@@ -28,6 +28,10 @@ TOKEN_TELEGRAM = os.getenv("TOKEN_TELEGRAM")
 ID_TELEGRAM = os.getenv("ID_TELEGRAM")
 BLOG_ID = os.getenv("BLOG_ID")
 
+# Credenciales para Facebook
+FB_PAGE_ID = os.getenv("FB_PAGE_ID")
+FB_ACCESS_TOKEN = os.getenv("FB_ACCESS_TOKEN")
+
 # Validación rápida de configuración de Telegram
 if ID_TELEGRAM and not ID_TELEGRAM.lstrip('-').isdigit():
     print(f"⚠️ ALERTA CONFIG: Tu ID_TELEGRAM ('{ID_TELEGRAM}') parece incorrecto. Debe ser NUMÉRICO (sin letras ni @).")
@@ -653,6 +657,41 @@ def publicar_en_blogger(titulo, contenido, etiquetas, img_url=None):
         print(f"⚠️ Error al publicar en Blogger: {e}")
         return False
 
+def publicar_en_facebook(mensaje, img_url=None):
+    """Publica en la página de Facebook usando Graph API."""
+    if MODO_PRUEBA:
+        print(f"\n🧪 [MODO PRUEBA] Simulación de envío a Facebook:")
+        print(f"Mensaje: {mensaje[:50]}...")
+        return True
+        
+    if not FB_PAGE_ID or not FB_ACCESS_TOKEN:
+        print("⚠️ Facebook: Credenciales no configuradas. Se omite.")
+        return False
+        
+    print("📡 Enviando publicación a Facebook...")
+    
+    try:
+        # Si hay imagen, usamos el endpoint de fotos, si no, el de feed (texto)
+        if img_url:
+            url = f"https://graph.facebook.com/v19.0/{FB_PAGE_ID}/photos"
+            payload = {'url': img_url, 'caption': mensaje, 'access_token': FB_ACCESS_TOKEN}
+        else:
+            url = f"https://graph.facebook.com/v19.0/{FB_PAGE_ID}/feed"
+            payload = {'message': mensaje, 'access_token': FB_ACCESS_TOKEN}
+            
+        response = requests.post(url, data=payload, timeout=15)
+        data = response.json()
+        
+        if 'id' in data:
+            print(f"✅ ¡PUBLICADO EN FACEBOOK! ID: {data['id']}")
+            return True
+        else:
+            print(f"❌ Error en Facebook: {data.get('error', {}).get('message', 'Desconocido')}")
+            return False
+    except Exception as e:
+        print(f"⚠️ Excepción al publicar en Facebook: {e}")
+        return False
+
 def enviar_telegram(mensaje):
     """
     Envía el mensaje formateado a Telegram. Divide mensajes largos si es necesario.
@@ -791,6 +830,9 @@ if __name__ == "__main__":
                     
                     # 5. Publicar en Blogger
                     publicar_en_blogger(titulo_blog, texto_limpio, hashtags_unicos, img_url)
+                    
+                    # 6. Publicar en Facebook (Texto limpio + Imagen)
+                    publicar_en_facebook(f"📌 {titulo_blog}\n\n{texto_limpio}\n\n{tags_str}", img_url)
                 else:
                     if hora_actual in [9, 22]:
                         enviar_telegram("⚠️ No se pudo generar el artículo de blog, pero el post de Square está activo.")
