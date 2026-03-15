@@ -19,7 +19,7 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install requests groq python-dotenv selenium webdriver-manager
+          pip install requests groq python-dotenv selenium webdriver-manager google-api-python-client google-auth-httplib2 google-auth-oauthlib
 
       - name: Ejecutar Bot en Modo FNG
         env:
