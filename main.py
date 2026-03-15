@@ -22,7 +22,7 @@ if SQUARE_API_KEY:
 MODO_PRUEBA = os.getenv("MODO_PRUEBA", "False").lower() == "true" # 🟢 Configurable. Por defecto False (Producción).
 GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama-3.3-70b-versatile").strip() # .strip() elimina espacios fantasma
 TIPO_BOT = os.getenv("TIPO_BOT", "TENDENCIA") # 🟢 Nuevo: Selecciona el modo de operación
-REFERIDO_BITGET = os.getenv("REFERIDO_BITGET", "TU_LINK_AQUI") # 🟢 Tu link de embajador
+REFERIDO_BITGET = os.getenv("REFERIDO_BITGET", "https://web3.bitget.com/share/1sEleg?inviteCode=vicmarsil18") # 🟢 Tu link de embajador
 
 # Credenciales para Telegram
 TOKEN_TELEGRAM = os.getenv("TOKEN_TELEGRAM")
