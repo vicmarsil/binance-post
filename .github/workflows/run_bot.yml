@@ -2,7 +2,7 @@ name: vIcmAr Binance Bot
 
 on:
   schedule:
-    - cron: '0 * * * *'    # Se ejecuta CADA HORA en el minuto 0 (Ej: 00:00, 01:00...)
+    - cron: '0 */3 * * *'  # Se ejecuta CADA 3 HORAS en el minuto 0 (Ej: 00:00, 03:00, 06:00...)
   workflow_dispatch:      # Permite ejecutarlo manualmente con opciones
     inputs:
       modo_prueba:
