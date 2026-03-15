@@ -633,6 +633,8 @@ def publicar_en_blogger(titulo, contenido, etiquetas, img_url=None):
         cuerpo_texto = contenido.replace('\n', '<br>')
         # Transformar las etiquetas bold básicas de Telegram en subtítulos vistosos para el blog
         cuerpo_texto = cuerpo_texto.replace('<b>', '<b style="color: #1a73e8; font-size: 1.15em; display: inline-block; margin-top: 10px;">')
+        # Darle estilo de terminal hacker a las etiquetas de código
+        cuerpo_texto = cuerpo_texto.replace('<code>', '<code style="background-color: #282c34; color: #98c379; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 0.95em;">')
         
         # Envolver todo en un contenedor con fuente moderna e interlineado cómodo
         contenido_html = f"""
@@ -833,8 +835,10 @@ if __name__ == "__main__":
                     # 5. Publicar en Blogger
                     publicar_en_blogger(titulo_blog, texto_limpio, hashtags_unicos, img_url)
                     
-                    # 6. Publicar en Facebook (Texto limpio + Imagen)
-                    publicar_en_facebook(f"📌 {titulo_blog}\n\n{texto_limpio}\n\n{tags_str}", img_url)
+                    # 6. Publicar en Facebook (Sin etiquetas HTML + Imagen)
+                    # Facebook no soporta HTML, así que borramos las etiquetas (<b>, <i>, <code>)
+                    texto_fb = re.sub(r'<[^>]+>', '', texto_limpio)
+                    publicar_en_facebook(f"📌 {titulo_blog}\n\n{texto_fb}\n\n{tags_str}", img_url)
                 else:
                     if hora_actual in [9, 22]:
                         enviar_telegram("⚠️ No se pudo generar el artículo de blog, pero el post de Square está activo.")
