@@ -457,18 +457,19 @@ def generar_articulo_blog(datos):
     
     WRITING STYLE (IMPORTANT):
     - Tone: "Diary of a Crypto Programmer". Use first person.
-    - MANDATORY phrases: "From my terminal in Argentina...", "Analyzing my script logs...", "The algorithm detected...".
+    - Phrase ideas: "From my terminal in Argentina...", "Analyzing my script logs...", "The algorithm detected...".
     - Focus: Technical but explanatory. Explain concepts like RSI or volume while analyzing.
     - DO NOT use generic AI phrases like "In today's digital world". Be raw, direct, and 'geeky'.
-    - FORMAT: Use simple HTML compatible with Telegram. Use <b> for bold/titles and <i> for emphasis. DO NOT USE MARKDOWN (** or __).
+    - FORMAT: Use simple HTML compatible with Telegram: <b> for bold/titles, <i> for emphasis, and <code> for terminal variables. DO NOT USE MARKDOWN (** or __).
+    - Use emojis to make the text visually engaging and less dense.
     
     STRUCTURE (HTML):
-    1. <b>Main Title</b> (Catchy and technical)
+    1. FIRST LINE: Only the raw Main Title (Catchy, NO HTML tags on the first line).
     2. <b>INTRODUCTION</b>: The first paragraph must briefly introduce the vIcmAr automation project.
     3. <b>📟 Console Discovery</b> (Context)
     4. <b>⚙️ Data Analysis</b> (Price and RSI breakdown)
     5. <b>🔮 Code Projection</b> (Conclusion)
-    6. <b>TAGS</b>: At the end, generate a list of 5 recommended tags (e.g., #Bitcoin #Trading #AI #RSI #{symbol}).
+    6. TAGS: At the very end, generate a list of 5 recommended tags (e.g., #Bitcoin #Trading #AI #RSI #{symbol}).
     
     Length: Minimum 500 words.
     """
@@ -592,7 +593,7 @@ def enviar_telegram_multimedia(mensaje, imagen_url):
     except: pass
     enviar_telegram(mensaje)
 
-def publicar_en_blogger(titulo, contenido, etiquetas):
+def publicar_en_blogger(titulo, contenido, etiquetas, img_url=None):
     """Publica el artículo en Blogger usando la API de Google."""
     if MODO_PRUEBA:
         print(f"\n🧪 [MODO PRUEBA] Simulación de envío a Blogger:")
@@ -615,9 +616,31 @@ def publicar_en_blogger(titulo, contenido, etiquetas):
         # Las etiquetas en Blogger no llevan el símbolo '#'
         etiquetas_limpias = [tag.replace('#', '') for tag in etiquetas]
         
+        # --- DISEÑO Y ESTILIZACIÓN WEB ---
+        html_imagen = ""
+        if img_url:
+            html_imagen = f"""
+            <div style="text-align: center; margin-bottom: 30px;">
+                <img src="{img_url}" alt="Análisis de {titulo}" style="max-width: 100%; height: auto; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.15);">
+            </div>
+            """
+            
+        # Reemplazar saltos de línea para la web
+        cuerpo_texto = contenido.replace('\n', '<br>')
+        # Transformar las etiquetas bold básicas de Telegram en subtítulos vistosos para el blog
+        cuerpo_texto = cuerpo_texto.replace('<b>', '<b style="color: #1a73e8; font-size: 1.15em; display: inline-block; margin-top: 10px;">')
+        
+        # Envolver todo en un contenedor con fuente moderna e interlineado cómodo
+        contenido_html = f"""
+        <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.8; color: #2c3e50; font-size: 16px;">
+            {html_imagen}
+            {cuerpo_texto}
+        </div>
+        """
+        
         post_body = {
             'title': titulo,
-            'content': contenido.replace('\n', '<br>'), # Convertir saltos de línea a HTML para Blogger
+            'content': contenido_html,
             'labels': etiquetas_limpias
         }
         
@@ -767,7 +790,7 @@ if __name__ == "__main__":
                         print(f"🔇 Telegram silenciado. (Hora actual UTC: {hora_actual}. Solo envía a las 9 y 22 UTC).")
                     
                     # 5. Publicar en Blogger
-                    publicar_en_blogger(titulo_blog, texto_limpio, hashtags_unicos)
+                    publicar_en_blogger(titulo_blog, texto_limpio, hashtags_unicos, img_url)
                 else:
                     if hora_actual in [9, 22]:
                         enviar_telegram("⚠️ No se pudo generar el artículo de blog, pero el post de Square está activo.")
