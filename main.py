@@ -12,7 +12,7 @@ import random
 from datetime import datetime, timedelta, timezone
 import urllib.parse
 from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
+from googleapiclient.discovery import build # type: ignore
 
 # --- CONFIGURACIÓN Y VARIABLES DE ENTORNO ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
