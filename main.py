@@ -11,7 +11,7 @@ import time
 import random
 from datetime import datetime, timedelta, timezone
 import urllib.parse
-from google.oauth2.credentials import Credentials
+from google.oauth2.credentials import Credentials # type: ignore
 from googleapiclient.discovery import build # type: ignore
 
 # --- CONFIGURACIÓN Y VARIABLES DE ENTORNO ---
