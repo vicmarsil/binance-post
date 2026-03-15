@@ -11,6 +11,10 @@ on:
         default: false
         type: boolean 
 
+concurrency:
+  group: bot-publicador
+  cancel-in-progress: false # Pone en fila de espera a los bots adicionales para evitar duplicados
+
 jobs:
   build:
     runs-on: ubuntu-latest

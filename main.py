@@ -100,7 +100,7 @@ COINGECKO_IDS = {
 # Validación básica de seguridad
 if not GROQ_API_KEY:
     raise ValueError("❌ Error: La variable GROQ_API_KEY no está configurada.")
-if not MODO_PRUEBA and not SQUARE_API_KEY and TIPO_BOT != "BITGET":
+if not MODO_PRUEBA and not SQUARE_API_KEY and TIPO_BOT not in ["BITGET", "LAUNCHPOOL"]:
     raise ValueError("❌ Error: SQUARE_API_KEY es necesaria para publicar en Binance (MODO_PRUEBA=False). Revisa tus Secretos en GitHub.")
 if not MODO_PRUEBA and SQUARE_API_KEY:
     print(f"🔑 SQUARE_API_KEY cargada correctamente (Longitud: {len(SQUARE_API_KEY)})")
@@ -765,7 +765,18 @@ def obtener_imagen_binance(symbol):
     except: pass
 
     # 3. Último recurso: Generar imagen con IA sobre el tema
-    return generar_imagen_ia(symbol.replace("USDT", ""), "bullish trend rising chart glowing")
+    img_url = generar_imagen_ia(symbol.replace("USDT", ""), "bullish trend rising chart glowing")
+    if img_url:
+        return img_url
+        
+    # 4. Fallback estático en caso de que la IA falle por completo
+    print("💡 Usando imagen genérica de respaldo para el reporte...")
+    imagenes_respaldo = [
+        "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?q=80&w=1024&auto=format&fit=crop", # Crypto abstracta
+        "https://images.unsplash.com/photo-1605792657660-596af9009e82?q=80&w=1024&auto=format&fit=crop", # Smartphone y finanzas
+        "https://images.unsplash.com/photo-1642104704074-907c0698cbd9?q=80&w=1024&auto=format&fit=crop"  # Billetera digital / Bitcoin
+    ]
+    return random.choice(imagenes_respaldo)
 
 def enviar_telegram_multimedia(mensaje, imagen_url):
     """Envía imagen + texto. Si cabe en caption usa un solo mensaje, si no, envía por separado."""
