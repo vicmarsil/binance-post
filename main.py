@@ -580,33 +580,36 @@ def publicar_en_square(contenido):
         return False
 
 def generar_imagen_ia(symbol, prompt_context="crypto trading chart futuristic style"):
-    """Genera una imagen IA on-the-fly usando Pollinations.ai (Gratis) si no hay logo."""
-    try:
-        # Prompt descriptivo para la IA
-        full_prompt = f"{symbol} coin logo, {prompt_context}, 3d render, 8k resolution, neon lighting"
-        encoded_prompt = urllib.parse.quote(full_prompt)
-        
-        # Generamos URL (Pollinations no requiere API Key)
-        initial_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={int(time.time())}"
-        print(f"🎨 Generando imagen IA para {symbol}...")
-        
-        # Pollinations.ai usa un redirect. Necesitamos la URL final para que Facebook la acepte.
-        # Usamos un timeout largo porque la generación puede tardar.
-        response = requests.get(initial_url, allow_redirects=True, timeout=60)
-        
-        if response.status_code == 200:
-            final_url = response.url
-            print(f"🖼️ URL final de la imagen obtenida: {final_url}")
-            return final_url
-        else:
-            print(f"⚠️ Error {response.status_code} al resolver la URL de la imagen de Pollinations.")
-            return None
-    except requests.exceptions.Timeout:
-        print("⚠️ Timeout: La generación de la imagen tardó demasiado. Se omitirá la imagen.")
-        return None
-    except Exception as e:
-        print(f"⚠️ Error generando imagen IA: {e}")
-        return None
+    """Genera una imagen IA on-the-fly usando Pollinations.ai con sistema de reintentos."""
+    full_prompt = f"{symbol} coin logo, {prompt_context}, 3d render, 8k resolution, neon lighting"
+    encoded_prompt = urllib.parse.quote(full_prompt)
+    
+    for intento in range(3):
+        try:
+            initial_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={int(time.time())}"
+            if intento == 0:
+                print(f"🎨 Generando imagen IA para {symbol}...")
+            else:
+                print(f"🔄 Reintento {intento + 1}/3 para generar imagen IA...")
+                
+            response = requests.get(initial_url, allow_redirects=True, timeout=60)
+            
+            if response.status_code == 200:
+                final_url = response.url
+                print(f"🖼️ URL final de la imagen obtenida: {final_url}")
+                return final_url
+            else:
+                print(f"⚠️ Error {response.status_code} al resolver la URL de la imagen (Pollinations).")
+                time.sleep(3) # Espera 3 segundos antes del próximo reintento
+        except requests.exceptions.Timeout:
+            print("⚠️ Timeout: La generación de la imagen tardó demasiado.")
+            time.sleep(3)
+        except Exception as e:
+            print(f"⚠️ Error generando imagen IA: {e}")
+            time.sleep(3)
+            
+    print("❌ Fallaron todos los intentos. Se omitirá la imagen IA.")
+    return None
 
 def obtener_imagen_binance(symbol):
     """Obtiene logo de Binance, GitHub o genera uno con IA."""
@@ -848,6 +851,11 @@ if __name__ == "__main__":
             # Generamos una imagen IA relacionada con pagos cripto y Web3
             img_url = generar_imagen_ia("Bitget Wallet", "futuristic digital wallet floating credit card cyberpunk neon web3 payment")
             
+            # Imagen de respaldo estática en caso de que la IA (Pollinations) falle definitivamente
+            if not img_url:
+                print("💡 Usando imagen promocional estática de respaldo...")
+                img_url = "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?q=80&w=1024&auto=format&fit=crop"
+
             print("📝 Publicando promoción de Bitget en Blogger...")
             
             # Fallback de seguridad: Si la IA desobedeció y dejó la URL en texto plano, la convertimos a enlace HTML forzosamente
