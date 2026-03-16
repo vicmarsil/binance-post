@@ -553,7 +553,14 @@ def generar_articulo_blog(datos):
     con estilo 'Diario de un Programador Cripto'.
     """
     symbol = datos.get('symbol')
-    precio = datos.get('price', datos.get('lastPrice'))
+    precio_float = float(datos.get('price', datos.get('lastPrice')))
+    if precio_float < 0.0001:
+        precio = f"{precio_float:.8f}".rstrip("0").rstrip(".")
+    elif precio_float < 1:
+        precio = f"{precio_float:.5f}".rstrip("0").rstrip(".")
+    else:
+        precio = f"{precio_float:.2f}"
+    if not precio: precio = "0"
     rsi = datos.get('rsi', 'N/A')
     cambio = datos.get('percent', 'N/A')
     
