@@ -319,7 +319,8 @@ def generar_post_inteligente(datos_mercado):
     - 🚫 PROHIBIDO hacer listas enumeradas (nada de 1. 2. 3.). Usa párrafos fluidos de 2-3 líneas máximo.
     - 🧠 VALOR AGREGADO: Es fundamental que incluyas una curiosidad o aspecto técnico real de la red/ecosistema de {moneda}.
     - 📊 INTEGRACIÓN: {instruccion_datos} Hazlo de forma conversacional.
-    - 👇 ENGAGEMENT: Termina con una pregunta fresca acorde al contexto, nunca repitas el típico "te leo en comentarios".
+    - 🎁 CTA (LLAMADO A LA ACCIÓN): Es VITAL que pidas sutilmente un "Me gusta" (👍) o que te sigan para recibir más análisis de valor (ej. "Sígueme y no te pierdas la próxima alerta").
+    -  ENGAGEMENT: Termina con una pregunta fresca acorde al contexto, nunca repitas el típico "te leo en comentarios".
     - 🎯 ETIQUETAS: OBLIGATORIO mencionar a @BinanceES al final del tweet.
     
     REGLAS:
@@ -370,10 +371,11 @@ def generar_post_fng(datos_fng):
     - Párrafos cortos.
     - Tono: Experto pero cercano.
     
-    INSTRUCCIONES ANTI-REPETICIÓN:
+    INSTRUCCIONES ANTI-REPETICIÓN Y ENGAGEMENT:
     - 🔄 TÍTULO DINÁMICO: No uses siempre el mismo título. Inventa titulares variados basados en el sentimiento actual ({clasificacion}).
     - 📊 EL DATO: Menciona que estamos en {valor}/100 de forma natural en el texto.
     - 🧠 ANÁLISIS: Haz una interpretación psicológica de lo que esto significa para los inversores HOY. Varía el enfoque (ballenas, pánico retail, etc.).
+    - 🎁 CTA PARA SEGUIDORES: Pide directamente un "Like" o un "Follow" para recibir esta actualización de mercado cada día.
     - 👇 CIERRE: Haz una pregunta distinta cada día. No repitas siempre "¿Compras o vendes?".
     
     REGLAS:
@@ -450,10 +452,11 @@ def generar_post_rsi(datos):
     
     OBJETIVO: Crear una alerta de oportunidad ("Buy the Dip" / Rebote inminente) pero que suene ÚNICA y humana.
     
-    INSTRUCCIONES ANTI-REPETICIÓN:
+    INSTRUCCIONES ANTI-REPETICIÓN Y ENGAGEMENT:
     - 🔄 Varía el gancho inicial (a veces usa 'Atención', otras veces una pregunta directa, otras una observación técnica).
     - 🧠 Explica el RSI de {rsi}/100 con diferentes palabras cada vez (ej. 'agotamiento de vendedores', 'los osos pierden fuerza', 'zona de acumulación').
     - 🚫 NO uses frases hechas como "Históricamente, tocar estos niveles...". Sé creativo.
+    - 🎁 CTA PODEROSO: Las alertas en tiempo real valen oro. Pide a la gente que te siga o deje su "Like" en agradecimiento por este dato anticipado.
     - 🚫 NUNCA repitas el mismo cierre. Inventa un llamado a la acción distinto.
     - 🚫 NO uses listas enumeradas. Escribe en párrafos cortos y fluidos.
     
@@ -1180,7 +1183,7 @@ if __name__ == "__main__":
                 img_url = obtener_imagen_binance(oportunidad['symbol'])
 
                 # Modificamos el post para X (Twitter) añadiendo el enlace al canal
-                post_twitter = f"{post_square}\n\n💬 Canal VIP gratis para más análisis: {LINK_TELEGRAM}"
+                post_twitter = f"{post_square}\n\n🔥 Únete a mi VIP gratis para adelantarte al mercado: {LINK_TELEGRAM}"
                 publicar_en_twitter(post_twitter, img_url)
                 guardar_historial(oportunidad['symbol']) # Opcional: Para evitar repetir si fallara algo externo
                 
