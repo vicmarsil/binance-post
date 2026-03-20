@@ -1,4 +1,6 @@
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from groq import Groq
 import json
 import time
@@ -28,6 +30,29 @@ if not MODO_PRUEBA and SQUARE_API_KEY:
 
 client = Groq(api_key=GROQ_API_KEY)
 
+# --- CONFIGURACIÓN DE RED AVANZADA ---
+# Reutiliza conexiones TCP (más rápido) y añade reintentos automáticos si hay micro-cortes.
+sesion_http = requests.Session()
+reintentos = Retry(total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
+sesion_http.mount('https://', HTTPAdapter(max_retries=reintentos))
+sesion_http.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+})
+
+def generar_texto_ia(prompt, temperatura=0.7):
+    """Función centralizada para interactuar con el modelo de IA de Groq."""
+    try:
+        print(f"🤖 Conectando con Groq (Modelo: {GROQ_MODEL_NAME})...")
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model=GROQ_MODEL_NAME,
+            temperature=temperatura
+        )
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        print(f"⚠️ Error generando texto con IA: {e}")
+        return None
+
 def cargar_historial():
     if os.path.exists(ARCHIVO_HISTORIAL):
         try:
@@ -56,8 +81,7 @@ def obtener_datos_coingecko(symbol):
         
         url = "https://api.coingecko.com/api/v3/simple/price"
         params = {'ids': cg_id, 'vs_currencies': 'usd', 'include_24hr_change': 'true'}
-        headers = {"User-Agent": "Mozilla/5.0"} # CoinGecko requiere User-Agent
-        resp = requests.get(url, params=params, headers=headers, timeout=10)
+        resp = sesion_http.get(url, params=params, timeout=10)
         
         if resp.status_code == 200:
             data = resp.json()
@@ -80,8 +104,7 @@ def obtener_fomo_coingecko(symbol):
         url = f"https://api.coingecko.com/api/v3/coins/{cg_id}"
         # Pedimos solo lo básico para no saturar la API
         params = {'localization': 'false', 'tickers': 'false', 'market_data': 'false', 'community_data': 'false', 'developer_data': 'false', 'sparkline': 'false'}
-        headers = {"User-Agent": "Mozilla/5.0"}
-        resp = requests.get(url, params=params, headers=headers, timeout=10)
+        resp = sesion_http.get(url, params=params, timeout=10)
         
         if resp.status_code == 200:
             data = resp.json()
@@ -123,14 +146,11 @@ def analizar_oportunidades():
         "https://api1.binance.com/api/v3/ticker/24hr",
         "https://api2.binance.com/api/v3/ticker/24hr"
     ]
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
 
     # --- 0. OBTENER CONTEXTO GLOBAL (BITCOIN) ---
     contexto_btc = 0
     try:
-        btc_resp = requests.get("https://api.binance.com/api/v3/ticker/24hr", params={'symbol': 'BTCUSDT'}, headers=headers, timeout=10)
+        btc_resp = sesion_http.get("https://api.binance.com/api/v3/ticker/24hr", params={'symbol': 'BTCUSDT'}, timeout=10)
         if btc_resp.status_code == 200:
             contexto_btc = float(btc_resp.json()['priceChangePercent'])
         print(f"🌍 Contexto Global (Bitcoin): {contexto_btc}%")
@@ -144,7 +164,7 @@ def analizar_oportunidades():
         for url_ticker in endpoints:
             try:
                 # 1. Obtener Datos de Precio 24h con rotación
-                resp = requests.get(url_ticker, params={'symbol': symbol}, headers=headers, timeout=15)
+                resp = sesion_http.get(url_ticker, params={'symbol': symbol}, timeout=15)
                 if resp.status_code == 200:
                     ticker = resp.json()
                     base_url = url_ticker.split("/api")[0]
@@ -310,19 +330,8 @@ def generar_post_inteligente(datos_mercado):
     - Máximo 260 caracteres ESTRICTO (para que quepa en un Tweet).
     - Incluye al final: ${moneda} $BNB #{moneda}
     """
-
-    try:
-        print(f"🤖 Intentando conectar con Groq usando modelo: '{GROQ_MODEL_NAME}'")
-        chat_completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            # Usamos la variable saneada
-            model=GROQ_MODEL_NAME,
-            temperature=0.7
-        )
-        return chat_completion.choices[0].message.content
-    except Exception as e:
-        print(f"⚠️ Error generando texto con Groq: {e}")
-        return None
+    
+    return generar_texto_ia(prompt)
 
 def obtener_fear_and_greed():
     """
@@ -331,7 +340,7 @@ def obtener_fear_and_greed():
     try:
         url = "https://api.alternative.me/fng/?limit=1"
         print(f"📡 Consultando Fear & Greed Index...")
-        response = requests.get(url, timeout=10)
+        response = sesion_http.get(url, timeout=10)
         data = response.json()
         if data['data']:
             return data['data'][0]
@@ -367,17 +376,7 @@ def generar_post_fng(datos_fng):
     - OBLIGATORIO: Hashtags #Bitcoin #FearAndGreed
     """
     
-    try:
-        print(f"🤖 Generando análisis de sentimiento con modelo: '{GROQ_MODEL_NAME}'")
-        chat_completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model=GROQ_MODEL_NAME,
-            temperature=0.7
-        )
-        return chat_completion.choices[0].message.content
-    except Exception as e:
-        print(f"⚠️ Error generando texto F&G con Groq: {e}")
-        return None
+    return generar_texto_ia(prompt)
 
 def calcular_indicadores(symbol, period_rsi=14, period_ema=50, base_url="https://api.binance.com", headers=None):
     """
@@ -387,7 +386,7 @@ def calcular_indicadores(symbol, period_rsi=14, period_ema=50, base_url="https:/
         url = f"{base_url}/api/v3/klines"
         # Traemos 100 velas de 1h para calcular bien el promedio
         params = {'symbol': symbol, 'interval': '1h', 'limit': 100}
-        response = requests.get(url, params=params, headers=headers, timeout=10)
+        response = sesion_http.get(url, params=params, timeout=10)
         data = response.json()
         
         if not data or len(data) < max(period_rsi, period_ema) + 1:
@@ -491,28 +490,15 @@ def generar_post_rsi(datos):
     - Máximo 260 caracteres ESTRICTO (para que quepa en un Tweet).
     - OBLIGATORIO: Cashtags ${moneda} {hashtag} #{moneda}
     """
-    # Reutilizamos la lógica de conexión a Groq copiando el bloque try/except simple
-    try:
-        print(f"🤖 Generando alerta RSI con modelo: '{GROQ_MODEL_NAME}'")
-        chat_completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model=GROQ_MODEL_NAME,
-            temperature=0.7
-        )
-        return chat_completion.choices[0].message.content
-    except Exception as e:
-        print(f"⚠️ Error generando texto RSI: {e}")
-        return None
+    
+    return generar_texto_ia(prompt)
 
 def buscar_anuncios_binance():
     """Busca nuevos Launchpools o listados en Binance."""
     print("🔍 Buscando nuevos anuncios de Launchpool/Listados en Binance...")
     try:
         url = "https://www.binance.com/bapi/composite/v1/public/cms/article/catalog/list/query?catalogId=54&pageNo=1&pageSize=3"
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
-        resp = requests.get(url, headers=headers, timeout=10)
+        resp = sesion_http.get(url, timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             if data.get('success') and data.get('data') and data['data'].get('articles'):
@@ -533,13 +519,7 @@ def generar_hilo_noticia(titulo_noticia):
     - Usa emojis de sirena 🚨 o fuego 🔥.
     - Máximo 260 caracteres ESTRICTO.
     """
-    try:
-        print("🤖 Generando Tweet de noticia de Binance...")
-        chat_completion = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=GROQ_MODEL_NAME, temperature=0.7)
-        return chat_completion.choices[0].message.content
-    except Exception as e:
-        print(f"⚠️ Error con Groq (Noticia): {e}")
-        return None
+    return generar_texto_ia(prompt)
 
 def generar_post_telegram(datos_mercado):
     """Genera un análisis exclusivo y profundo para el canal VIP de Telegram."""
@@ -591,13 +571,7 @@ def generar_post_telegram(datos_mercado):
     - Longitud: 3-4 párrafos fluidos y fáciles de leer. NO hagas testamentos inmensos.
     - NO pongas enlaces ni menciones redes sociales.
     """
-    try:
-        print(f"🤖 Generando análisis VIP para Telegram...")
-        chat_completion = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=GROQ_MODEL_NAME, temperature=0.7)
-        return chat_completion.choices[0].message.content
-    except Exception as e:
-        print(f"⚠️ Error generando texto Telegram con Groq: {e}")
-        return None
+    return generar_texto_ia(prompt)
 
 def generar_articulo_blog(datos):
     """
@@ -656,17 +630,7 @@ def generar_articulo_blog(datos):
     Length: Minimum 400 words.
     """
     
-    try:
-        print(f"✍️ Redactando artículo de blog para {symbol}...")
-        chat_completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model=GROQ_MODEL_NAME,
-            temperature=0.7
-        )
-        return chat_completion.choices[0].message.content
-    except Exception as e:
-        print(f"⚠️ Error generando artículo blog: {e}")
-        return None
+    return generar_texto_ia(prompt)
 
 def generar_articulo_bitget(referido):
     """Genera un artículo promocional diario de Bitget Wallet con enfoques aleatorios."""
@@ -697,13 +661,7 @@ def generar_articulo_bitget(referido):
       3. Al final, añade 5 etiquetas (ej: #BitgetWallet #Web3 #CryptoCard).
     - Extensión mínima: 350 palabras.
     """
-    try:
-        print("✍️ Redactando artículo promocional de Bitget...")
-        chat_completion = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=GROQ_MODEL_NAME, temperature=0.7)
-        return chat_completion.choices[0].message.content
-    except Exception as e:
-        print(f"⚠️ Error en Groq con Bitget: {e}")
-        return None
+    return generar_texto_ia(prompt)
 
 def generar_tweet_bitget(referido):
     """Genera un Tweet específico súper corto para promocionar Bitget."""
@@ -719,15 +677,7 @@ def generar_tweet_bitget(referido):
     - OBLIGATORIO: Menciona a @BitgetES y @BitgetWallet y usa hashtags #Web3 #Bitget
     - Al final, añade una línea nueva con el enlace a tu canal de Telegram: "💬 VIP gratis: {LINK_TELEGRAM}"
     """
-    try:
-        print("✍️ Redactando Tweet promocional de Bitget...")
-        chat_completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}], model=GROQ_MODEL_NAME, temperature=0.7
-        )
-        return chat_completion.choices[0].message.content
-    except Exception as e:
-        print(f"⚠️ Error generando Tweet Bitget: {e}")
-        return None
+    return generar_texto_ia(prompt)
 
 def generar_imagen_ia(symbol, prompt_context="crypto trading chart futuristic style"):
     """Genera una imagen IA on-the-fly usando Pollinations.ai con sistema de reintentos."""
@@ -742,7 +692,7 @@ def generar_imagen_ia(symbol, prompt_context="crypto trading chart futuristic st
             else:
                 print(f"🔄 Reintento {intento + 1}/3 para generar imagen IA...")
                 
-            response = requests.get(initial_url, allow_redirects=True, timeout=60)
+            response = sesion_http.get(initial_url, allow_redirects=True, timeout=60)
             
             if response.status_code == 200:
                 final_url = response.url
@@ -767,7 +717,7 @@ def obtener_imagen_binance(symbol):
         # 1. Intentar API interna de Binance
         url = "https://www.binance.com/bapi/asset/v2/public/asset-service/product/get-product-by-symbol"
         params = {"symbol": symbol} # Ej: BTCUSDT
-        resp = requests.get(url, params=params, timeout=5)
+        resp = sesion_http.get(url, params=params, timeout=5)
         if resp.status_code == 200:
             data = resp.json()
             product_data = data.get("data")
@@ -780,7 +730,7 @@ def obtener_imagen_binance(symbol):
     base = symbol.replace("USDT", "").lower()
     github_url = f"https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/{base}.png"
     try:
-        check = requests.head(github_url, timeout=3)
+        check = sesion_http.head(github_url, timeout=3)
         if check.status_code == 200:
             return github_url
     except: pass
