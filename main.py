@@ -1,101 +1,22 @@
-import os
-from dotenv import load_dotenv
-
-# Cargar variables de entorno ANTES de intentar leerlas
-load_dotenv()
-
 import requests
 from groq import Groq
 import json
 import time
 import random
-import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import urllib.parse
-from google.oauth2.credentials import Credentials # type: ignore
-from googleapiclient.discovery import build # type: ignore
-import tweepy # type: ignore
+import re
+import os
 
-# --- CONFIGURACIÓN Y VARIABLES DE ENTORNO ---
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-SQUARE_API_KEY = os.getenv("SQUARE_API_KEY")
-if SQUARE_API_KEY:
-    SQUARE_API_KEY = SQUARE_API_KEY.strip() # Limpieza de seguridad: elimina espacios al inicio/final
-MODO_PRUEBA = os.getenv("MODO_PRUEBA", "False").lower() == "true" # 🟢 Configurable. Por defecto False (Producción).
-GROQ_MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "llama-3.3-70b-versatile").strip() # .strip() elimina espacios fantasma
-TIPO_BOT = os.getenv("TIPO_BOT", "TENDENCIA") # 🟢 Nuevo: Selecciona el modo de operación
-REFERIDO_BITGET = os.getenv("REFERIDO_BITGET", "https://web3.bitget.com/share/1sEleg?inviteCode=vicmarsil18") # 🟢 Tu link de embajador
-LINK_TELEGRAM = os.getenv("LINK_TELEGRAM", "https://t.me/LaTerminaldevIcmAr") # 🟢 Tu canal para atraer tráfico
+from config import *
+from redes_sociales import (
+    publicar_en_square, publicar_en_blogger, publicar_en_twitter,
+    publicar_en_facebook, enviar_telegram, enviar_telegram_multimedia,
+    notificar_admin_telegram
+)
 
-# Credenciales para Telegram
-TOKEN_TELEGRAM = os.getenv("TOKEN_TELEGRAM")
-ID_TELEGRAM = os.getenv("ID_TELEGRAM")
-ID_TELEGRAM_ADMIN = os.getenv("ID_TELEGRAM_ADMIN") # 🟢 Tu ID personal para emergencias de Twitter
-BLOG_ID = os.getenv("BLOG_ID")
-
-# Credenciales para Facebook
-FB_PAGE_ID = os.getenv("FB_PAGE_ID")
-FB_ACCESS_TOKEN = os.getenv("FB_ACCESS_TOKEN")
-
-# Credenciales para X (Twitter)
-TWITTER_API_KEY = os.getenv("TWITTER_API_KEY")
-if TWITTER_API_KEY: TWITTER_API_KEY = TWITTER_API_KEY.strip()
-TWITTER_API_SECRET = os.getenv("TWITTER_API_SECRET")
-if TWITTER_API_SECRET: TWITTER_API_SECRET = TWITTER_API_SECRET.strip()
-TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
-if TWITTER_ACCESS_TOKEN: TWITTER_ACCESS_TOKEN = TWITTER_ACCESS_TOKEN.strip()
-TWITTER_ACCESS_SECRET = os.getenv("TWITTER_ACCESS_SECRET")
-if TWITTER_ACCESS_SECRET: TWITTER_ACCESS_SECRET = TWITTER_ACCESS_SECRET.strip()
-
-# Validación rápida de configuración de Telegram
 if ID_TELEGRAM and not (ID_TELEGRAM.lstrip('-').isdigit() or ID_TELEGRAM.startswith('@')):
-    print(f"⚠️ ALERTA CONFIG: Tu ID_TELEGRAM ('{ID_TELEGRAM}') parece incorrecto. Debe ser NUMÉRICO o empezar con '@' para canales.")
-    print("   👉 Usa @userinfobot en Telegram para obtener tu número real.")
-
-# 🛡️ Parche de seguridad: Si el entorno (.env local) tiene el modelo viejo, forzamos el nuevo.
-# Usamos 'in' para detectar variantes con espacios o comillas
-if "llama3-8b-8192" in GROQ_MODEL_NAME:
-    print("⚠️ Configuración detectada con modelo deprecado. Actualizando automáticamente a llama-3.3-70b-versatile.")
-    GROQ_MODEL_NAME = "llama-3.3-70b-versatile"
-
-ARCHIVO_HISTORIAL = "historial.json"
-
-# --- LISTA DE MONEDAS A ANALIZAR (MAJORS & ALTA LIQUIDEZ) ---
-MONEDAS_ANALISIS = [
-    'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 
-    'ADAUSDT', 'AVAXUSDT', 'TRXUSDT', 'LINKUSDT', 'DOTUSDT', 'MATICUSDT',
-    'DOGEUSDT', 'SHIBUSDT', 'PEPEUSDT', 'WIFUSDT', # Memecoins populares
-    'SUIUSDT', 'APTUSDT', 'ARBUSDT', 'OPUSDT', 'NEARUSDT', 'TIAUSDT', # Layer 1 y 2
-    'INJUSDT', 'FETUSDT', 'RNDRUSDT' # Inteligencia Artificial
-]
-
-# Mapeo para CoinGecko (Backup si Binance falla)
-COINGECKO_IDS = {
-    'BTCUSDT': 'bitcoin',
-    'ETHUSDT': 'ethereum',
-    'BNBUSDT': 'binancecoin',
-    'SOLUSDT': 'solana',
-    'XRPUSDT': 'ripple',
-    'ADAUSDT': 'cardano',
-    'AVAXUSDT': 'avalanche-2',
-    'TRXUSDT': 'tron',
-    'LINKUSDT': 'chainlink',
-    'DOTUSDT': 'polkadot',
-    'MATICUSDT': 'matic-network',
-    'DOGEUSDT': 'dogecoin',
-    'SHIBUSDT': 'shiba-inu',
-    'PEPEUSDT': 'pepe',
-    'WIFUSDT': 'dogwifcoin',
-    'SUIUSDT': 'sui',
-    'APTUSDT': 'aptos',
-    'ARBUSDT': 'arbitrum',
-    'OPUSDT': 'optimism',
-    'NEARUSDT': 'near',
-    'TIAUSDT': 'celestia',
-    'INJUSDT': 'injective-protocol',
-    'FETUSDT': 'fetch-ai',
-    'RNDRUSDT': 'render-token'
-}
+    print(f"⚠️ ALERTA CONFIG: Tu ID_TELEGRAM ('{ID_TELEGRAM}') parece incorrecto. Debe ser NUMÉRICO.")
 
 # Validación básica de seguridad
 if not GROQ_API_KEY:
@@ -206,6 +127,16 @@ def analizar_oportunidades():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
+    # --- 0. OBTENER CONTEXTO GLOBAL (BITCOIN) ---
+    contexto_btc = 0
+    try:
+        btc_resp = requests.get("https://api.binance.com/api/v3/ticker/24hr", params={'symbol': 'BTCUSDT'}, headers=headers, timeout=10)
+        if btc_resp.status_code == 200:
+            contexto_btc = float(btc_resp.json()['priceChangePercent'])
+        print(f"🌍 Contexto Global (Bitcoin): {contexto_btc}%")
+    except Exception as e:
+        print("⚠️ No se pudo obtener el contexto de Bitcoin.")
+
     for symbol in monedas_filtradas:
         ticker = None
         base_url = "https://api.binance.com"
@@ -239,18 +170,23 @@ def analizar_oportunidades():
         try:
             # 2. Calcular RSI 1h
             if base_url:
-                rsi, _ = calcular_rsi(symbol, base_url=base_url, headers=headers)
+                rsi, ema50, _ = calcular_indicadores(symbol, base_url=base_url, headers=headers)
             else:
                 rsi = 50 # RSI Neutro si usamos CoinGecko (solo estrategia de volatilidad)
+                ema50 = None
             
             # Si falla el RSI (None) pero tenemos precio, usamos 50 para no descartar la moneda
-            if rsi is None: rsi = 50
+            if rsi is None: 
+                rsi = 50
+                ema50 = None
 
             candidatos.append({
                 "symbol": symbol.replace("USDT", ""),
                 "lastPrice": float(ticker['lastPrice']),
                 "percent": float(ticker['priceChangePercent']),
-                "rsi": rsi
+                "rsi": rsi,
+                "ema50": ema50,
+                "btc_change": contexto_btc
             })
             time.sleep(0.1) # Pausa cortés a la API
         except Exception as e:
@@ -330,6 +266,17 @@ def generar_post_inteligente(datos_mercado):
         else:
             info_tecnica += f"\n    - Sentimiento Social: ⚖️ Neutro/Indecisión ({fomo}% alcistas)."
         instruccion_datos += " Menciona también cómo se siente la comunidad (el FOMO o el Miedo) según el sentimiento social."
+
+    ema50 = datos_mercado.get('ema50')
+    if ema50:
+        tendencia_ema = "Alcista (Precio > EMA50)" if precio_float > ema50 else "Bajista o Falso Rebote (Precio < EMA50)"
+        info_tecnica += f"\n    - Media Móvil (EMA 50): {tendencia_ema}."
+
+    btc_change = datos_mercado.get('btc_change', 0)
+    if btc_change <= -2:
+        info_tecnica += f"\n    - Efecto Bitcoin: ⚠️ BTC está cayendo ({btc_change}%), advierte que podría arrastrar a esta moneda."
+    elif btc_change >= 2:
+        info_tecnica += f"\n    - Efecto Bitcoin: 🔥 BTC subiendo ({btc_change}%), viento a favor para el mercado general."
 
     # --- VARIACIÓN ALEATORIA DE ESTRUCTURA Y TONO (ANTI-REPETICIÓN) ---
     enfoques = [
@@ -432,9 +379,9 @@ def generar_post_fng(datos_fng):
         print(f"⚠️ Error generando texto F&G con Groq: {e}")
         return None
 
-def calcular_rsi(symbol, period=14, base_url="https://api.binance.com", headers=None):
+def calcular_indicadores(symbol, period_rsi=14, period_ema=50, base_url="https://api.binance.com", headers=None):
     """
-    Calcula el RSI (1h) para detectar sobreventa.
+    Calcula el RSI (1h) y la EMA 50 para confirmar tendencia.
     """
     try:
         url = f"{base_url}/api/v3/klines"
@@ -443,8 +390,8 @@ def calcular_rsi(symbol, period=14, base_url="https://api.binance.com", headers=
         response = requests.get(url, params=params, headers=headers, timeout=10)
         data = response.json()
         
-        if not data or len(data) < period + 1:
-            return None, None
+        if not data or len(data) < max(period_rsi, period_ema) + 1:
+            return None, None, None
 
         closes = [float(x[4]) for x in data]
         
@@ -458,13 +405,13 @@ def calcular_rsi(symbol, period=14, base_url="https://api.binance.com", headers=
             losses.append(max(-delta, 0))
             
         # Promedio inicial
-        avg_gain = sum(gains[:period]) / period
-        avg_loss = sum(losses[:period]) / period
+        avg_gain = sum(gains[:period_rsi]) / period_rsi
+        avg_loss = sum(losses[:period_rsi]) / period_rsi
         
         # Suavizado (Wilder's Smoothing)
-        for i in range(period, len(gains)):
-            avg_gain = (avg_gain * (period - 1) + gains[i]) / period
-            avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+        for i in range(period_rsi, len(gains)):
+            avg_gain = (avg_gain * (period_rsi - 1) + gains[i]) / period_rsi
+            avg_loss = (avg_loss * (period_rsi - 1) + losses[i]) / period_rsi
             
         if avg_loss == 0:
             rsi = 100
@@ -472,15 +419,27 @@ def calcular_rsi(symbol, period=14, base_url="https://api.binance.com", headers=
             rs = avg_gain / avg_loss
             rsi = 100 - (100 / (1 + rs))
             
-        return rsi, closes[-1]
+        # Cálculo de la EMA 50
+        sma = sum(closes[:period_ema]) / period_ema
+        ema = sma
+        multiplier = 2 / (period_ema + 1)
+        for close in closes[period_ema:]:
+            ema = (close - ema) * multiplier + ema
+
+        return rsi, ema, closes[-1]
     except Exception as e:
         # print(f"⚠️ Debug RSI {symbol}: {e}") # Descomentar para depuración profunda
-        return None, None
+        return None, None, None
 
 def generar_post_rsi(datos):
     moneda = datos['symbol']
     rsi = int(datos['rsi']) if datos['rsi'] else 50
-    precio = "{:.2f}".format(datos['price'])
+    
+    precio_float = float(datos['price'])
+    if precio_float < 1:
+        precio = f"{precio_float:.8f}".rstrip("0").rstrip(".")
+    else:
+        precio = f"{precio_float:.2f}"
     
     fomo = datos.get('fomo')
     contexto_fomo = ""
@@ -491,6 +450,17 @@ def generar_post_rsi(datos):
             contexto_fomo = f"\n    - DATO EXTRA: Hay 😨 MUCHO MIEDO en la comunidad ({fomo}% alcistas)."
         else:
             contexto_fomo = f"\n    - DATO EXTRA: Sentimiento social ⚖️ neutro ({fomo}% alcistas)."
+
+    ema50 = datos.get('ema50')
+    if ema50:
+        tendencia_ema = "Soportada sobre la EMA 50 (Fuerte)" if precio_float > ema50 else "Debajo de la EMA 50 (Riesgo de falsa subida)"
+        contexto_fomo += f"\n    - EMA 50: {tendencia_ema}."
+        
+    btc_change = datos.get('btc_change', 0)
+    if btc_change <= -2:
+        contexto_fomo += f"\n    - ALERTA MACRO: Bitcoin está sangrando ({btc_change}%)."
+    elif btc_change >= 2:
+        contexto_fomo += f"\n    - ALERTA MACRO: Bitcoin está liderando el mercado ({btc_change}%)."
 
     if rsi <= 30:
         estado = "SOBREVENTA (Oversold)"
@@ -595,6 +565,17 @@ def generar_post_telegram(datos_mercado):
             texto_fomo = f" | Sentimiento Social: 😨 MIEDO EXTREMO ({fomo}% alcistas)"
         else:
             texto_fomo = f" | Sentimiento Social: ⚖️ Neutro ({fomo}% alcistas)"
+
+    ema50 = datos_mercado.get('ema50')
+    if ema50:
+        tend_ema = "🟢 Arriba de EMA50" if precio_float > ema50 else "🔴 Debajo de EMA50"
+        texto_fomo += f" | Tendencia Macro: {tend_ema}"
+
+    btc_change = datos_mercado.get('btc_change', 0)
+    if btc_change <= -2:
+        texto_fomo += f"\n⚠️ ADVERTENCIA: Bitcoin está cayendo ({btc_change}%). Precaución general."
+    elif btc_change >= 2:
+        texto_fomo += f"\n🚀 CONTEXTO: Bitcoin subiendo con fuerza ({btc_change}%)."
 
     prompt = f"""
     Actúa como vIcmAr, administrando tu canal VIP de Telegram 'La Terminal'.
@@ -748,53 +729,6 @@ def generar_tweet_bitget(referido):
         print(f"⚠️ Error generando Tweet Bitget: {e}")
         return None
 
-def publicar_en_square(contenido):
-    """
-    3. Publicación Automática:
-    Envía el contenido a Binance Square (Solo texto para asegurar entrega).
-    """
-    if MODO_PRUEBA:
-        print(f"\n🧪 [MODO PRUEBA] Simulación de envío a Binance Square:")
-        print(f"--------------------------------------------------")
-        print(f"Texto:\n{contenido}")
-        print(f"--------------------------------------------------")
-        return True
-
-    # Endpoint oficial para AI Skills / Short Posts
-    url = "https://www.binance.com/bapi/composite/v1/public/pgc/openApi/content/add"
-    
-    headers = {
-        "X-Square-OpenAPI-Key": SQUARE_API_KEY,
-        "Content-Type": "application/json",
-        "clienttype": "binanceSkill" # Este campo es vital para que Binance sepa que es un Skill
-    }
-
-    # Intentamos primero solo con texto para asegurar que la cuenta está activa
-    # Binance a veces rechaza URLs de imágenes externas por seguridad
-    payload = {
-        "bodyTextOnly": contenido 
-    }
-    
-    print(f"📡 Enviando post (solo texto) a Binance Square...")
-    
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        resultado = response.json()
-        
-        # El código "000000" es el éxito real en Binance
-        if resultado.get("code") == "000000":
-            # Intentamos obtener el ID de forma segura
-            post_id = resultado.get('data', {}).get('id', 'Desconocido')
-            print(f"🚀 PUBLICADO! ID del Post: {post_id}")
-            return True
-        else:
-            print(f"❌ Binance rechazó el post: {resultado.get('message')} (Código: {resultado.get('code')})")
-            return False
-
-    except Exception as e:
-        print(f"⚠️ Error técnico: {e}")
-        return False
-
 def generar_imagen_ia(symbol, prompt_context="crypto trading chart futuristic style"):
     """Genera una imagen IA on-the-fly usando Pollinations.ai con sistema de reintentos."""
     full_prompt = f"{symbol} coin logo, {prompt_context}, 3d render, 8k resolution, neon lighting"
@@ -865,268 +799,6 @@ def obtener_imagen_binance(symbol):
     ]
     return random.choice(imagenes_respaldo)
 
-def enviar_telegram_multimedia(mensaje, imagen_url):
-    """Envía imagen + texto. Si cabe en caption usa un solo mensaje, si no, envía por separado."""
-    if not imagen_url:
-        enviar_telegram(mensaje)
-        return
-        
-    url_photo = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendPhoto"
-    
-    # 1. Intentar Caption (Límite 1024 chars para captions en Telegram)
-    if len(mensaje) < 1000:
-        payload = {"chat_id": ID_TELEGRAM, "photo": imagen_url, "caption": mensaje, "parse_mode": "HTML"}
-        try:
-            r = requests.post(url_photo, json=payload, timeout=10)
-            if r.status_code == 200: return
-        except: pass
-    
-    # 2. Si falla o es largo: Foto sola + Texto separado
-    try:
-        requests.post(url_photo, json={"chat_id": ID_TELEGRAM, "photo": imagen_url}, timeout=10)
-    except: pass
-    enviar_telegram(mensaje)
-
-def notificar_admin_telegram(mensaje_alerta, img_url=None):
-    """Envía un mensaje directo al administrador (tú) si X falla para que lo subas manual."""
-    if not TOKEN_TELEGRAM or not ID_TELEGRAM_ADMIN:
-        print("⚠️ No hay ID_TELEGRAM_ADMIN configurado. No se puede enviar el Tweet de respaldo.")
-        return
-        
-    print("📲 Enviando Tweet de respaldo a tu Telegram personal...")
-    url_bot = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendMessage"
-    texto = f"🚨 <b>¡Fallo al publicar en X (Twitter)!</b>\n\nCopia este texto (toca para copiar) y súbelo manual a tu cuenta:\n\n<code>{mensaje_alerta}</code>"
-    if img_url:
-        texto += f"\n\n🖼️ Imagen: <a href='{img_url}'>Descargar aquí</a>"
-        
-    payload = {"chat_id": ID_TELEGRAM_ADMIN, "text": texto, "parse_mode": "HTML"}
-    try:
-        requests.post(url_bot, json=payload, timeout=10)
-    except Exception as e:
-        print(f"⚠️ Error enviando respaldo a admin: {e}")
-
-def publicar_en_blogger(titulo, contenido, etiquetas, img_url=None):
-    """Publica el artículo en Blogger usando la API de Google."""
-    if MODO_PRUEBA:
-        print(f"\n🧪 [MODO PRUEBA] Simulación de envío a Blogger:")
-        print(f"Título: {titulo}")
-        return True
-
-    if not BLOG_ID:
-        print("⚠️ BLOG_ID no configurado. Omitiendo publicación en Blogger.")
-        return False
-
-    if not os.path.exists('token.json'):
-        print("❌ Error: Archivo 'token.json' no encontrado. Ejecuta auth_blogger.py primero.")
-        return False
-
-    try:
-        # Cargar credenciales desde el archivo token.json
-        creds = Credentials.from_authorized_user_file('token.json', ['https://www.googleapis.com/auth/blogger'])
-        service = build('blogger', 'v3', credentials=creds)
-        
-        # Las etiquetas en Blogger no llevan el símbolo '#'
-        etiquetas_limpias = [tag.replace('#', '') for tag in etiquetas]
-        
-        # --- DISEÑO Y ESTILIZACIÓN WEB ---
-        html_imagen = ""
-        if img_url:
-            html_imagen = f"""
-            <div style="text-align: center; margin-bottom: 30px;">
-                <img src="{img_url}" alt="Análisis de {titulo}" style="max-width: 100%; height: auto; border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,0.15);">
-            </div>
-            """
-            
-        # Reemplazar saltos de línea para la web
-        cuerpo_texto = contenido.replace('\n', '<br>')
-        # Transformar las etiquetas bold básicas de Telegram en subtítulos vistosos para el blog
-        cuerpo_texto = cuerpo_texto.replace('<b>', '<b style="color: #1a73e8; font-size: 1.15em; display: inline-block; margin-top: 10px;">')
-        # Darle estilo de terminal hacker a las etiquetas de código
-        cuerpo_texto = cuerpo_texto.replace('<code>', '<code style="background-color: #282c34; color: #98c379; padding: 2px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 0.95em;">')
-        # Hacer que los enlaces destaquen (Color dorado tipo Bitget y abrir en nueva pestaña)
-        cuerpo_texto = cuerpo_texto.replace('<a href=', '<a style="color: #d8a011; font-weight: bold; text-decoration: underline;" target="_blank" href=')
-        
-        # Envolver todo en un contenedor con fuente moderna e interlineado cómodo
-        contenido_html = f"""
-        <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.8; color: #2c3e50; font-size: 16px;">
-            {html_imagen}
-            {cuerpo_texto}
-        </div>
-        """
-        
-        post_body = {
-            'title': titulo,
-            'content': contenido_html,
-            'labels': etiquetas_limpias
-        }
-        
-        print("📡 Enviando artículo a Blogger...")
-        request = service.posts().insert(blogId=BLOG_ID, body=post_body, isDraft=False)
-        response = request.execute()
-        print(f"✅ ¡PUBLICADO EN BLOGGER! URL: {response.get('url')}")
-        return True
-    except Exception as e:
-        print(f"⚠️ Error al publicar en Blogger: {e}")
-        return False
-
-def publicar_en_twitter(mensaje, img_url=None):
-    """Publica un tweet usando la API v2 de X (Twitter) y adjunta imagen si se provee."""
-    if MODO_PRUEBA:
-        print(f"\n🧪 [MODO PRUEBA] Simulación de envío a X (Twitter):\n{mensaje}")
-        return True
-        
-    if not all([TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET]):
-        print("⚠️ X (Twitter): Credenciales incompletas. Se omite.")
-        notificar_admin_telegram(mensaje, img_url) # Enviar por Telegram en caso de fallo
-        return False
-        
-    print("📡 Enviando publicación a X (Twitter)...")
-    client_tw = tweepy.Client(
-        consumer_key=TWITTER_API_KEY, consumer_secret=TWITTER_API_SECRET,
-        access_token=TWITTER_ACCESS_TOKEN, access_token_secret=TWITTER_ACCESS_SECRET
-    )
-    
-    media_ids = None
-    if img_url:
-        try:
-            # Tweepy v1.1 es necesario para subir imágenes (Soportado en Free Tier)
-            auth = tweepy.OAuth1UserHandler(TWITTER_API_KEY, TWITTER_API_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET)
-            api_v1 = tweepy.API(auth)
-            
-            print("🖼️ Descargando imagen para X (Twitter)...")
-            r = requests.get(img_url, timeout=15)
-            if r.status_code == 200:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp_file:
-                    tmp_file.write(r.content)
-                    tmp_path = tmp_file.name
-                
-                print("🖼️ Subiendo imagen a los servidores de X...")
-                media = api_v1.media_upload(tmp_path)
-                media_ids = [media.media_id]
-                os.remove(tmp_path)
-        except Exception as e:
-            print(f"⚠️ Error adjuntando imagen en X: {e}. Se publicará solo texto.")
-
-    for intento in range(3):
-        try:
-            if media_ids:
-                response = client_tw.create_tweet(text=mensaje, media_ids=media_ids)
-            else:
-                response = client_tw.create_tweet(text=mensaje)
-            print(f"✅ ¡PUBLICADO EN X! ID del Tweet: {response.data['id']}")
-            return True
-        except Exception as e:
-            error_msg = str(e)
-            # Si es un error temporal del servidor (503, 500, etc), reintentamos
-            if "503" in error_msg or "Service Unavailable" in error_msg or "500" in error_msg or "502" in error_msg:
-                print(f"⚠️ Los servidores de X están saturados (Error 50x). Reintento {intento + 1}/3 en 5 segundos...")
-                time.sleep(5)
-            else:
-                print(f"❌ Error publicando en X (Twitter): {type(e).__name__} - {e}")
-                notificar_admin_telegram(mensaje, img_url)
-                return False
-                
-    print("❌ Se agotaron los reintentos para publicar en X por fallo del servidor.")
-    notificar_admin_telegram(mensaje, img_url)
-    return False
-
-def publicar_en_facebook(mensaje, img_url=None):
-    """Publica en la página de Facebook usando Graph API."""
-    if MODO_PRUEBA:
-        print(f"\n🧪 [MODO PRUEBA] Simulación de envío a Facebook:")
-        print(f"Mensaje: {mensaje[:50]}...")
-        return True
-        
-    if not FB_PAGE_ID or not FB_ACCESS_TOKEN:
-        print("⚠️ Facebook: Credenciales no configuradas. Se omite.")
-        return False
-        
-    print("📡 Enviando publicación a Facebook...")
-    
-    try:
-        # Si hay imagen, usamos el endpoint de fotos, si no, el de feed (texto)
-        if img_url:
-            url = f"https://graph.facebook.com/v19.0/{FB_PAGE_ID}/photos"
-            payload = {'url': img_url, 'caption': mensaje, 'access_token': FB_ACCESS_TOKEN}
-        else:
-            url = f"https://graph.facebook.com/v19.0/{FB_PAGE_ID}/feed"
-            payload = {'message': mensaje, 'access_token': FB_ACCESS_TOKEN}
-            
-        response = requests.post(url, data=payload, timeout=15)
-        data = response.json()
-        
-        if 'id' in data:
-            print(f"✅ ¡PUBLICADO EN FACEBOOK! ID: {data['id']}")
-            return True
-        else:
-            print(f"❌ Error en Facebook: {data.get('error', {}).get('message', 'Desconocido')}")
-            return False
-    except Exception as e:
-        print(f"⚠️ Excepción al publicar en Facebook: {e}")
-        return False
-
-def enviar_telegram(mensaje):
-    """
-    Envía el mensaje formateado a Telegram. Divide mensajes largos si es necesario.
-    """
-    # --- FILTRO HORARIO DESACTIVADO PARA ESTA ESTRATEGIA ---
-    # Al usar cronjobs específicos (09:30 y 22:00 UTC), controlamos la hora desde GitHub.
-    # El código de silencio anterior podría bloquear el reporte de las 06:30 AM exactas.
-    pass
-    # ------------------------------------------------
-
-    if not TOKEN_TELEGRAM or not ID_TELEGRAM:
-        print("⚠️ Telegram: Credenciales no configuradas. Se omite el envío.")
-        return
-
-    url = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendMessage"
-    
-    # Telegram limita a 4096 caracteres.
-    # Fragmentación inteligente: 4000 chars y corte por saltos de línea para proteger el HTML.
-    max_length = 4000
-    mensajes_split = []
-    
-    temp_msg = mensaje
-    while len(temp_msg) > 0:
-        if len(temp_msg) <= max_length:
-            mensajes_split.append(temp_msg)
-            break
-        
-        # Cortar en el último salto de línea (o espacio) dentro del límite para no romper etiquetas ** o __
-        corte = temp_msg.rfind('\n', 0, max_length)
-        if corte == -1: corte = temp_msg.rfind(' ', 0, max_length)
-        if corte == -1: corte = max_length
-
-        mensajes_split.append(temp_msg[:corte])
-        temp_msg = temp_msg[corte:].lstrip() # Avanzamos y limpiamos espacios al inicio del siguiente bloque
-
-    for i, msg_chunk in enumerate(mensajes_split):
-        payload = {
-            "chat_id": ID_TELEGRAM,
-            "text": msg_chunk,
-            "parse_mode": "HTML",
-            "disable_web_page_preview": True
-        }
-        try:
-            print(f"📨 Enviando parte {i+1}/{len(mensajes_split)} a Telegram...")
-            response = requests.post(url, json=payload, timeout=10)
-            if response.status_code == 200:
-                print("✅ Telegram enviado correctamente.")
-            else:
-                print(f"⚠️ Error Telegram {response.status_code}: {response.text}")
-                
-                if "chat not found" in response.text:
-                    print("💡 AYUDA: El bot no tiene permiso para escribirte. Envíale /start en Telegram o verifica tu ID_TELEGRAM.")
-                # Si falla por formato Markdown (muy común con IA), reintentamos sin formato.
-                # Usamos 'elif' para no reintentar si el chat no existe (sería inútil).
-                elif response.status_code == 400:
-                    print("🔄 Reintentando envío sin formato HTML (texto plano)...")
-                    payload.pop("parse_mode", None)
-                    requests.post(url, json=payload, timeout=10)
-            time.sleep(1) # Pequeña pausa para evitar rate limits
-        except Exception as e:
-            print(f"⚠️ Error enviando a Telegram: {e}")
-
 if __name__ == "__main__":
     print("🤖 Iniciando Bot vIcmAr...")
     print(f"⚙️ Versión 2.1 - Modelo: {GROQ_MODEL_NAME} | Modo: {TIPO_BOT}")
@@ -1153,7 +825,6 @@ if __name__ == "__main__":
             titulo = lineas[0].replace('#', '').strip()
             contenido = "\n".join(lineas[1:]).strip()
             
-            import re
             hashtags = re.findall(r'#\w+', contenido)
             hashtags_unicos = list(dict.fromkeys(hashtags))
             texto_limpio = re.sub(r'#\w+', '', contenido).strip()
@@ -1284,7 +955,6 @@ if __name__ == "__main__":
                     contenido_blog = "\n".join(lineas[1:]).strip()
                     
                     # Extraer hashtags usando expresiones regulares
-                    import re
                     hashtags = re.findall(r'#\w+', contenido_blog)
                     hashtags_unicos = list(dict.fromkeys(hashtags)) # Eliminar duplicados
                     
