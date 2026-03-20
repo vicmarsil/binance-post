@@ -150,6 +150,26 @@ def obtener_datos_coingecko(symbol):
         print(f"⚠️ Error CoinGecko ({symbol}): {e}")
     return None
 
+def obtener_fomo_coingecko(symbol):
+    """Obtiene el porcentaje de sentimiento alcista (FOMO) de la comunidad en CoinGecko."""
+    cg_id = COINGECKO_IDS.get(symbol)
+    if not cg_id: return None
+    
+    try:
+        url = f"https://api.coingecko.com/api/v3/coins/{cg_id}"
+        # Pedimos solo lo básico para no saturar la API
+        params = {'localization': 'false', 'tickers': 'false', 'market_data': 'false', 'community_data': 'false', 'developer_data': 'false', 'sparkline': 'false'}
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, params=params, headers=headers, timeout=10)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            fomo = data.get('sentiment_votes_up_percentage')
+            return float(fomo) if fomo is not None else None
+    except Exception as e:
+        print(f"⚠️ Error obteniendo FOMO social para {symbol}: {e}")
+    return None
+
 def analizar_oportunidades():
     """
     Analiza la lista MONEDAS_ANALISIS y selecciona la MEJOR oportunidad basada en:
@@ -277,11 +297,17 @@ def generar_post_inteligente(datos_mercado):
         precio = f"{precio_float:.2f}"
 
     # Contexto dinámico para que la IA tenga variedad en su análisis
-    contexto_tecnico = "Tendencia normal de mercado."
-    if float(cambio) > 20:
-        contexto_tecnico = "Subida explosiva (posible FOMO). Menciona cautela por volatilidad."
-    elif float(cambio) > 5:
-        contexto_tecnico = "Tendencia alcista sólida. Menciona ruptura de niveles."
+    cambio_float = float(cambio)
+    if cambio_float > 20:
+        contexto_tecnico = "Subida explosiva (posible FOMO). Tendencia fuertemente alcista. Menciona cautela por volatilidad."
+    elif cambio_float > 5:
+        contexto_tecnico = "Tendencia alcista sólida. El activo está ganando valor. Menciona fortaleza."
+    elif cambio_float < -20:
+        contexto_tecnico = "Caída severa (posible capitulación o pánico). Tendencia fuertemente bajista. Analiza si es oportunidad de rebote o riesgo."
+    elif cambio_float < -5:
+        contexto_tecnico = "Tendencia bajista continua. El activo ha estado perdiendo valor de forma constante. Sugiere precaución."
+    else:
+        contexto_tecnico = "Mercado lateral o consolidando. Volatilidad moderada, tendencia neutra."
     
     estado_rsi = "Neutro"
     if rsi > 70: estado_rsi = "Sobrecompra (Riesgo de corrección)"
@@ -289,11 +315,21 @@ def generar_post_inteligente(datos_mercado):
     
     # Condicionar si hablamos del RSI. Si es 50 (neutro o por defecto de API caída), omitimos mencionarlo.
     if rsi != 50:
-        info_rsi = f"- RSI (1h): {rsi:.1f} ({estado_rsi})"
+        info_tecnica = f"- RSI (1h): {rsi:.1f} ({estado_rsi})"
         instruccion_datos = f"Integra los datos ({precio}, RSI) dentro de las oraciones de forma narrativa."
     else:
-        info_rsi = "- Enfoque: Acción del precio, volatilidad y tendencia reciente."
+        info_tecnica = "- Enfoque: Acción del precio, volatilidad y tendencia reciente."
         instruccion_datos = f"Integra el precio ({precio}) y la variación dentro de las oraciones. NO menciones el RSI en absoluto."
+
+    fomo = datos_mercado.get('fomo')
+    if fomo:
+        if fomo >= 75:
+            info_tecnica += f"\n    - Sentimiento Social: 🔥 ALTO FOMO ({fomo}% de los usuarios están comprando/alcistas)."
+        elif fomo <= 40:
+            info_tecnica += f"\n    - Sentimiento Social: 😨 MIEDO / PÁNICO (Solo {fomo}% están alcistas, la mayoría vende)."
+        else:
+            info_tecnica += f"\n    - Sentimiento Social: ⚖️ Neutro/Indecisión ({fomo}% alcistas)."
+        instruccion_datos += " Menciona también cómo se siente la comunidad (el FOMO o el Miedo) según el sentimiento social."
 
     # --- VARIACIÓN ALEATORIA DE ESTRUCTURA Y TONO (ANTI-REPETICIÓN) ---
     enfoques = [
@@ -310,7 +346,7 @@ def generar_post_inteligente(datos_mercado):
     DATOS DEL MERCADO:
     - Activo: {moneda}
     - Precio: {precio} USDT (Variación: {cambio}%)
-    {info_rsi}
+    {info_tecnica}
     - Contexto: {contexto_tecnico}
     
     INSTRUCCIONES DE REDACCIÓN OBLIGATORIAS:
@@ -446,15 +482,36 @@ def generar_post_rsi(datos):
     rsi = int(datos['rsi']) if datos['rsi'] else 50
     precio = "{:.2f}".format(datos['price'])
     
+    fomo = datos.get('fomo')
+    contexto_fomo = ""
+    if fomo:
+        if fomo >= 75:
+            contexto_fomo = f"\n    - DATO EXTRA: La comunidad tiene 🔥 ALTO FOMO ({fomo}% alcistas)."
+        elif fomo <= 40:
+            contexto_fomo = f"\n    - DATO EXTRA: Hay 😨 MUCHO MIEDO en la comunidad ({fomo}% alcistas)."
+        else:
+            contexto_fomo = f"\n    - DATO EXTRA: Sentimiento social ⚖️ neutro ({fomo}% alcistas)."
+
+    if rsi <= 30:
+        estado = "SOBREVENTA (Oversold)"
+        objetivo = 'alerta de oportunidad ("Buy the Dip" / posible rebote inminente)'
+        explicacion_rsi = f"el RSI de {rsi}/100 indica agotamiento de vendedores o zona de acumulación"
+        hashtag = "#BuyTheDip"
+    else:
+        estado = "SOBRECOMPRA (Overbought)"
+        objetivo = 'alerta de precaución (posible corrección o toma de ganancias inminente)'
+        explicacion_rsi = f"el RSI de {rsi}/100 indica euforia en el mercado, posible techo local o agotamiento de compradores"
+        hashtag = "#TakeProfit"
+
     prompt = f"""
     Actúa como un trader veterano de Binance Square.
-    DATOS: {moneda} está en zona de SOBREVENTA (RSI: {rsi}) en gráfico de 1h. Precio: {precio}.
+    DATOS: {moneda} está en zona de {estado} en gráfico de 1h. Precio: {precio}. {contexto_fomo}
     
-    OBJETIVO: Crear una alerta de oportunidad ("Buy the Dip" / Rebote inminente) pero que suene ÚNICA y humana.
+    OBJETIVO: Crear una {objetivo} que suene ÚNICA y humana.
     
     INSTRUCCIONES ANTI-REPETICIÓN Y ENGAGEMENT:
     - 🔄 Varía el gancho inicial (a veces usa 'Atención', otras veces una pregunta directa, otras una observación técnica).
-    - 🧠 Explica el RSI de {rsi}/100 con diferentes palabras cada vez (ej. 'agotamiento de vendedores', 'los osos pierden fuerza', 'zona de acumulación').
+    - 🧠 Explica que {explicacion_rsi} con diferentes palabras cada vez.
     - 🚫 NO uses frases hechas como "Históricamente, tocar estos niveles...". Sé creativo.
     - 🎁 CTA PODEROSO: Las alertas en tiempo real valen oro. Pide a la gente que te siga o deje su "Like" en agradecimiento por este dato anticipado.
     - 🚫 NUNCA repitas el mismo cierre. Inventa un llamado a la acción distinto.
@@ -462,7 +519,7 @@ def generar_post_rsi(datos):
     
     REGLAS:
     - Máximo 260 caracteres ESTRICTO (para que quepa en un Tweet).
-    - OBLIGATORIO: Cashtags ${moneda} #BuyTheDip #{moneda}
+    - OBLIGATORIO: Cashtags ${moneda} {hashtag} #{moneda}
     """
     # Reutilizamos la lógica de conexión a Groq copiando el bloque try/except simple
     try:
@@ -527,11 +584,22 @@ def generar_post_telegram(datos_mercado):
     elif rsi < 30: estado_rsi = "🟢 Sobreventa (Oportunidad de compra)"
     
     info_rsi = f"- RSI (1h): {rsi:.1f} {estado_rsi}" if rsi != 50 else ""
+    tendencia = "Alcista 📈" if float(cambio) > 0 else "Bajista 📉"
+
+    fomo = datos_mercado.get('fomo')
+    texto_fomo = ""
+    if fomo:
+        if fomo >= 75:
+            texto_fomo = f" | Sentimiento Social: 🔥 ALTO FOMO ({fomo}% alcistas)"
+        elif fomo <= 40:
+            texto_fomo = f" | Sentimiento Social: 😨 MIEDO EXTREMO ({fomo}% alcistas)"
+        else:
+            texto_fomo = f" | Sentimiento Social: ⚖️ Neutro ({fomo}% alcistas)"
 
     prompt = f"""
     Actúa como vIcmAr, administrando tu canal VIP de Telegram 'La Terminal'.
     
-    DATOS DE MERCADO: {moneda} | Precio: {precio} USDT | Cambio 24h: {cambio}% {info_rsi}
+    DATOS DE MERCADO: {moneda} | Precio: {precio} USDT | Cambio 24h: {cambio}% (Tendencia {tendencia}) {info_rsi} {texto_fomo}
     
     OBJETIVO: Escribir un análisis EXCLUSIVO de mercado para los suscriptores de tu canal.
     Debes aportar más "alfa" (valor técnico, posibles proyecciones o sentimiento) que en un simple Tweet.
@@ -566,6 +634,13 @@ def generar_articulo_blog(datos):
     if not precio: precio = "0"
     rsi = datos.get('rsi', 'N/A')
     cambio = datos.get('percent', 'N/A')
+    cambio_float = float(cambio) if cambio != 'N/A' else 0
+    tendencia = "Bullish (Uptrend)" if cambio_float > 0 else "Bearish (Downtrend/Drop)"
+    
+    fomo = datos.get('fomo')
+    texto_fomo = ""
+    if fomo:
+        texto_fomo = f" Community Sentiment: {fomo}% Bullish (FOMO Indicator)."
     
     enfoques_blog = [
         "Start by discussing the broader macroeconomic sentiment or general crypto market volatility, then drill down into this specific coin.",
@@ -580,7 +655,7 @@ def generar_articulo_blog(datos):
     
     TASK: Write a technical and educational blog article for Publish0x.
     TOPIC: Deep technical analysis of {symbol}.
-    DATA: Price: {precio} USDT. RSI: {rsi}. 24h Change: {cambio}%.
+    DATA: Price: {precio} USDT. RSI: {rsi}. 24h Change: {cambio}% ({tendencia}).{texto_fomo}
     
     LANGUAGE: ENGLISH. The entire content MUST be in English.
     
@@ -1169,6 +1244,10 @@ if __name__ == "__main__":
         if oportunidad:
             # Adaptamos datos para consistencia (lastPrice -> price en funciones viejas)
             oportunidad['price'] = oportunidad['lastPrice'] 
+            
+            # NUEVO: Obtener FOMO de la comunidad para la moneda ganadora
+            print(f"👥 Obteniendo sentimiento social (FOMO) para {oportunidad['symbol']}...")
+            oportunidad['fomo'] = obtener_fomo_coingecko(oportunidad['symbol'] + "USDT")
             
             # Generamos Post Corto para Square (usamos la lógica inteligente general o RSI si es extremo)
             if oportunidad['rsi'] <= 30 or oportunidad['rsi'] >= 70:
