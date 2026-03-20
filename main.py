@@ -12,9 +12,8 @@ import os
 
 from config import *
 from redes_sociales import (
-    publicar_en_square, publicar_en_blogger, publicar_en_twitter,
-    publicar_en_facebook, enviar_telegram, enviar_telegram_multimedia,
-    notificar_admin_telegram
+    publicar_en_square, publicar_en_blogger,
+    publicar_en_facebook, enviar_telegram, enviar_telegram_multimedia
 )
 
 if ID_TELEGRAM and not (ID_TELEGRAM.lstrip('-').isdigit() or ID_TELEGRAM.startswith('@')):
@@ -507,20 +506,6 @@ def buscar_anuncios_binance():
         print(f"⚠️ Error buscando noticias: {e}")
     return None
 
-def generar_hilo_noticia(titulo_noticia):
-    prompt = f"""
-    Actúa como un experto en criptomonedas en Twitter.
-    Binance acaba de anunciar: "{titulo_noticia}"
-    
-    TAREA: Escribe un tweet de ALERTA sobre este anuncio para generar mucha interacción.
-    
-    REGLAS:
-    - OBLIGATORIO: Etiqueta a @BinanceES.
-    - Usa emojis de sirena 🚨 o fuego 🔥.
-    - Máximo 260 caracteres ESTRICTO.
-    """
-    return generar_texto_ia(prompt)
-
 def generar_post_telegram(datos_mercado):
     """Genera un análisis exclusivo y profundo para el canal VIP de Telegram."""
     moneda = datos_mercado['symbol']
@@ -663,22 +648,6 @@ def generar_articulo_bitget(referido):
     """
     return generar_texto_ia(prompt)
 
-def generar_tweet_bitget(referido):
-    """Genera un Tweet específico súper corto para promocionar Bitget."""
-    prompt = f"""
-    Actúa como un influencer Web3 en Twitter.
-    TAREA: Escribir un tweet MUY CORTO, fresco y atractivo promocionando Bitget Wallet.
-    ENLACE OBLIGATORIO A INCLUIR EN EL TEXTO: {referido}
-    
-    REGLAS:
-    - Máximo 260 caracteres EN TOTAL.
-    - NO saludes. Ve directo al grano.
-    - Usa 1 o 2 emojis.
-    - OBLIGATORIO: Menciona a @BitgetES y @BitgetWallet y usa hashtags #Web3 #Bitget
-    - Al final, añade una línea nueva con el enlace a tu canal de Telegram: "💬 VIP gratis: {LINK_TELEGRAM}"
-    """
-    return generar_texto_ia(prompt)
-
 def generar_imagen_ia(symbol, prompt_context="crypto trading chart futuristic style"):
     """Genera una imagen IA on-the-fly usando Pollinations.ai con sistema de reintentos."""
     full_prompt = f"{symbol} coin logo, {prompt_context}, 3d render, 8k resolution, neon lighting"
@@ -761,7 +730,6 @@ if __name__ == "__main__":
             post = generar_post_fng(datos)
             if post:
                 publicar_en_square(post)
-                publicar_en_twitter(post)
                 # Nota: No guardamos historial para F&G porque es un post diario único.
     
     elif TIPO_BOT == "BITGET":
@@ -812,11 +780,6 @@ if __name__ == "__main__":
             mensaje_tg = f"📌 <b>{titulo}</b>\n\n{texto_limpio}\n\n🔗 <a href='{REFERIDO_BITGET}'>Solicita tu Bitget Card Aquí</a>\n\n <a href='{LINK_TELEGRAM}'>Únete al canal VIP para más análisis</a>\n\n{tags_str}"
             enviar_telegram(mensaje_tg)
             
-            print("📝 Publicando promoción de Bitget en X (Twitter)...")
-            tweet_bitget = generar_tweet_bitget(REFERIDO_BITGET)
-            if tweet_bitget:
-                publicar_en_twitter(tweet_bitget, img_url)
-            
         # IMPORTANTE: NO PUBLICAMOS EN BINANCE SQUARE para evitar baneos.
 
     elif TIPO_BOT == "LAUNCHPOOL":
@@ -834,17 +797,12 @@ if __name__ == "__main__":
                 print("😴 No hay anuncios nuevos en Binance Launchpool/Listing.")
             else:
                 print(f"🚨 ¡NUEVO ANUNCIO DETECTADO!: {titulo}")
-                tweet = generar_hilo_noticia(titulo)
                 link_noticia = f"https://www.binance.com/en/support/announcement/{codigo}"
                 
-                if tweet:
-                    tweet_final = f"{tweet}\n\n👉 Lee más aquí: {link_noticia}\n💬 VIP: {LINK_TELEGRAM}"
-                    publicar_en_twitter(tweet_final) # Se publica como breaking news en X
-                    
-                    msg_tg = f"🚨 <b>¡ALERTA DE BINANCE!</b> 🚨\n\n{titulo}\n\n🔗 <a href='{link_noticia}'>Leer Anuncio Oficial</a>\n\n💬 <a href='{LINK_TELEGRAM}'>Únete al VIP aquí</a>"
-                    enviar_telegram(msg_tg)
-                    
-                    guardar_historial(codigo)
+                msg_tg = f"🚨 <b>¡ALERTA DE BINANCE!</b> 🚨\n\n{titulo}\n\n🔗 <a href='{link_noticia}'>Leer Anuncio Oficial</a>\n\n💬 <a href='{LINK_TELEGRAM}'>Únete al VIP aquí</a>"
+                enviar_telegram(msg_tg)
+                
+                guardar_historial(codigo)
 
     else:
         # --- MODO REPORTE DIARIO (Matutino/Vespertino) ---
@@ -882,9 +840,6 @@ if __name__ == "__main__":
                 # Obtenemos la imagen antes de X para poder adjuntarla
                 img_url = obtener_imagen_binance(oportunidad['symbol'])
 
-                # Modificamos el post para X (Twitter) añadiendo el enlace al canal
-                post_twitter = f"{post_square}\n\n🔥 Únete a mi VIP gratis para adelantarte al mercado: {LINK_TELEGRAM}"
-                publicar_en_twitter(post_twitter, img_url)
                 guardar_historial(oportunidad['symbol']) # Opcional: Para evitar repetir si fallara algo externo
                 
                 # --- POST EXCLUSIVO CANAL VIP TELEGRAM ---
