@@ -1,9 +1,9 @@
-name: vIcmAr Fear & Greed Diario
+name: Radar Señales Futuros
 
 on:
   schedule:
-    - cron: '0 12 * * *'  # Se ejecuta todos los días a las 12:00 UTC
-  workflow_dispatch:      # Permite probarlo manualmente
+    - cron: '15 10-23,0-2 * * *'  # Activo de 07:00 a 23:00 hora Argentina (UTC-3)
+  workflow_dispatch:      # Botón manual
 
 jobs:
   build:
@@ -21,14 +21,12 @@ jobs:
         run: |
           pip install requests groq python-dotenv selenium webdriver-manager google-api-python-client google-auth-httplib2 google-auth-oauthlib
 
-      - name: Ejecutar Bot en Modo FNG
+      - name: Ejecutar Bot de Futuros
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          SQUARE_API_KEY: ${{ secrets.SQUARE_API_KEY }}
           MODO_PRUEBA: 'False'
           GROQ_MODEL_NAME: "llama-3.3-70b-versatile"
-          TIPO_BOT: "FNG"  # 👈 Esto activa el nuevo modo en main.py
+          TIPO_BOT: "FUTUROS"  # Activa la nueva lógica
           TOKEN_TELEGRAM: ${{ secrets.TOKEN_TELEGRAM }}
           ID_TELEGRAM: ${{ secrets.ID_TELEGRAM }}
-          ID_TELEGRAM_ADMIN: ${{ secrets.ID_TELEGRAM_ADMIN }}
         run: python main.py

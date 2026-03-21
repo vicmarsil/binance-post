@@ -189,7 +189,7 @@ def analizar_oportunidades():
         try:
             # 2. Calcular RSI 1h
             if base_url:
-                rsi, ema50, _ = calcular_indicadores(symbol, base_url=base_url, headers=headers)
+                rsi, ema50, _ = calcular_indicadores(symbol, base_url=base_url)
             else:
                 rsi = 50 # RSI Neutro si usamos CoinGecko (solo estrategia de volatilidad)
                 ema50 = None
@@ -490,6 +490,41 @@ def generar_post_rsi(datos):
     - OBLIGATORIO: Cashtags ${moneda} {hashtag} #{moneda}
     """
     
+    return generar_texto_ia(prompt)
+
+def generar_senal_futuros(datos_mercado):
+    """Genera una señal estructurada de trading de Futuros (Long/Short) basada en IA y Análisis Técnico."""
+    moneda = datos_mercado['symbol']
+    cambio = float(datos_mercado['percent'])
+    rsi = datos_mercado.get('rsi', 50)
+    precio = float(datos_mercado['lastPrice'])
+    
+    # Determinamos la dirección más lógica basándonos en la regresión a la media
+    if rsi <= 30 or (rsi == 50 and cambio <= -5):
+        direccion = "LONG 🟢 (Posible rebote por sobreventa o capitulación)"
+    elif rsi >= 70 or (rsi == 50 and cambio >= 5):
+        direccion = "SHORT 🔴 (Posible corrección por sobrecompra o fomo excesivo)"
+    else:
+        direccion = "LONG/SHORT (Evaluar acción del precio, mercado lateral)"
+
+    prompt = f"""
+    Actúa como un trader institucional de Futuros de criptomonedas.
+    DATOS EN TIEMPO REAL: Moneda: {moneda}/USDT | Precio: {precio} | Cambio 24h: {cambio}% | RSI(1h): {rsi}
+    Tendencia estadística sugerida: {direccion}
+    
+    TAREA: Escribe una SEÑAL DE TRADING directa y al grano para enviar por Telegram.
+    
+    FORMATO ESTRICTO REQUERIDO (Usa HTML básico <b>, <i>):
+    🚨 <b>ALERTA DE VOLATILIDAD / SEÑAL DE FUTUROS</b> 🚨
+    <b>Par:</b> {moneda}/USDT
+    <b>Operación:</b> [LONG o SHORT]
+    <b>Apalancamiento:</b> [Ej: Aisaldo 5x - 10x]
+    <b>Contexto:</b> [1-2 líneas explicando por qué subió o cayó y la justificación técnica]
+    
+    🎯 <b>Entrada:</b> [Precio o rango lógico basado en {precio}]
+    💸 <b>Take Profit (TP):</b> [2 o 3 niveles matemáticamente coherentes]
+    🛑 <b>Stop Loss (SL):</b> [Un nivel estricto para limitar pérdidas]
+    """
     return generar_texto_ia(prompt)
 
 def buscar_anuncios_binance():
@@ -803,6 +838,23 @@ if __name__ == "__main__":
                 enviar_telegram(msg_tg)
                 
                 guardar_historial(codigo)
+
+    elif TIPO_BOT == "FUTUROS":
+        # --- MODO SEÑALES DE FUTUROS PARA TELEGRAM ---
+        print("🚀 Iniciando modo Alertas de Futuros (Telegram)...")
+        oportunidad = analizar_oportunidades()
+        
+        if oportunidad:
+            # Filtro: Solo enviamos señal si hay volatilidad decente (>4%) o RSI extremo
+            if abs(oportunidad['percent']) >= 4 or oportunidad['rsi'] <= 35 or oportunidad['rsi'] >= 65:
+                print(f"🚨 ¡Volatilidad detectada en {oportunidad['symbol']}! Generando señal...")
+                senal = generar_senal_futuros(oportunidad)
+                if senal:
+                    enlace_trade = f"https://www.binance.com/es/futures/{oportunidad['symbol']}USDT"
+                    mensaje = f"{senal}\n\n👉 <a href='{enlace_trade}'>Operar en Binance Futures</a>"
+                    enviar_telegram(mensaje)
+            else:
+                print("😴 El mercado está demasiado tranquilo. No se enviarán señales forzadas para evitar falsos rompimientos.")
 
     else:
         # --- MODO REPORTE DIARIO (Matutino/Vespertino) ---
