@@ -23,7 +23,7 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install requests groq python-dotenv selenium webdriver-manager google-api-python-client google-auth-httplib2 google-auth-oauthlib tweepy
+          pip install requests groq python-dotenv selenium webdriver-manager google-api-python-client google-auth-httplib2 google-auth-oauthlib
 
       - name: Ejecutar Rastreador
         env:
@@ -34,10 +34,6 @@ jobs:
           TOKEN_TELEGRAM: ${{ secrets.TOKEN_TELEGRAM }}
           ID_TELEGRAM: ${{ secrets.ID_TELEGRAM }}
           ID_TELEGRAM_ADMIN: ${{ secrets.ID_TELEGRAM_ADMIN }}
-          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
-          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
-          TWITTER_ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
-          TWITTER_ACCESS_SECRET: ${{ secrets.TWITTER_ACCESS_SECRET }}
         run: python main.py
 
       - name: Guardar base de datos (Historial de noticias)
