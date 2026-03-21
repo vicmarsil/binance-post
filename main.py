@@ -11,18 +11,12 @@ import re
 import os
 
 from config import *
-from redes_sociales import (
-    publicar_en_square, publicar_en_blogger,
-    publicar_en_facebook, enviar_telegram, enviar_telegram_multimedia
-)
-
-if ID_TELEGRAM and not (ID_TELEGRAM.lstrip('-').isdigit() or ID_TELEGRAM.startswith('@')):
-    print(f"⚠️ ALERTA CONFIG: Tu ID_TELEGRAM ('{ID_TELEGRAM}') parece incorrecto. Debe ser NUMÉRICO.")
+from redes_sociales import publicar_en_square
 
 # Validación básica de seguridad
 if not GROQ_API_KEY:
     raise ValueError("❌ Error: La variable GROQ_API_KEY no está configurada.")
-if not MODO_PRUEBA and not SQUARE_API_KEY and TIPO_BOT not in ["BITGET", "LAUNCHPOOL", "FUTUROS"]:
+if not MODO_PRUEBA and not SQUARE_API_KEY:
     raise ValueError("❌ Error: SQUARE_API_KEY es necesaria para publicar en Binance (MODO_PRUEBA=False). Revisa tus Secretos en GitHub.")
 if not MODO_PRUEBA and SQUARE_API_KEY:
     print(f"🔑 SQUARE_API_KEY cargada correctamente (Longitud: {len(SQUARE_API_KEY)})")
@@ -281,13 +275,8 @@ def generar_post_inteligente(datos_mercado):
 
     fomo = datos_mercado.get('fomo')
     if fomo:
-        if fomo >= 75:
-            info_tecnica += f"\n    - Sentimiento Social: 🔥 ALTO FOMO ({fomo}% de los usuarios están comprando/alcistas)."
-        elif fomo <= 40:
-            info_tecnica += f"\n    - Sentimiento Social: 😨 MIEDO / PÁNICO (Solo {fomo}% están alcistas, la mayoría vende)."
-        else:
-            info_tecnica += f"\n    - Sentimiento Social: ⚖️ Neutro/Indecisión ({fomo}% alcistas)."
-        instruccion_datos += " Menciona también cómo se siente la comunidad (el FOMO o el Miedo) según el sentimiento social."
+        info_tecnica += f"\n    - Métrica de Sentimiento: {fomo}% de usuarios alcistas."
+        instruccion_datos += " Interpreta el sentimiento de la comunidad con tus propias palabras, relaciona el nivel de optimismo/miedo con los fundamentales del proyecto."
 
     ema50 = datos_mercado.get('ema50')
     if ema50:
@@ -310,7 +299,7 @@ def generar_post_inteligente(datos_mercado):
     enfoque_seleccionado = random.choice(enfoques)
 
     prompt = f"""
-    Actúa como un creador premium de Binance Square. Eres experto, magnético y NUNCA suenas repetitivo.
+    Actúa como un analista fundamental y técnico top en Binance Square. Tu objetivo principal es demostrar autoridad, atraer seguidores fieles y aportar muchísimo valor.
     
     DATOS DEL MERCADO:
     - Activo: {moneda}
@@ -320,16 +309,15 @@ def generar_post_inteligente(datos_mercado):
     
     INSTRUCCIONES DE REDACCIÓN OBLIGATORIAS:
     - 🎯 ENFOQUE DE ESTA PUBLICACIÓN: {enfoque_seleccionado}
-    - 🚫 CERO PLANTILLAS: No uses siempre la misma estructura. Cambia la forma en la que presentas el post (a veces usa título, a veces entra directo al texto).
-    - 🚫 PROHIBIDO hacer listas enumeradas (nada de 1. 2. 3.). Usa párrafos fluidos de 2-3 líneas máximo.
-    - 🧠 VALOR AGREGADO: Es fundamental que incluyas una curiosidad o aspecto técnico real de la red/ecosistema de {moneda}.
-    - 📊 INTEGRACIÓN: {instruccion_datos} Hazlo de forma conversacional.
-    - 🎁 CTA (LLAMADO A LA ACCIÓN): Es VITAL que pidas sutilmente un "Me gusta" (👍) o que te sigan para recibir más análisis de valor (ej. "Sígueme y no te pierdas la próxima alerta").
-    -  ENGAGEMENT: Termina con una pregunta fresca acorde al contexto, nunca repitas el típico "te leo en comentarios".
-    - 🎯 ETIQUETAS: OBLIGATORIO mencionar a @BinanceES al final del tweet.
+    - 🧠 ANÁLISIS FUNDAMENTAL (VITAL): Usa tu conocimiento base para incluir 1 o 2 líneas explicando QUÉ resuelve {moneda}, sus alianzas, actualizaciones recientes, próximas inversiones de red o narrativas clave. Justifica el movimiento del precio basándote en la utilidad del token. ¡No hables solo de números!
+    - 🚫 CERO REPETICIÓN: Evita frases trilladas o cliché como "el FOMO está en llamas", "históricamente", etc. Usa un vocabulario financiero rico y variado.
+    - 🚫 FORMATO: Escribe en párrafos fluidos y atractivos. NUNCA uses listas enumeradas (1. 2. 3.).
+    - 📊 INTEGRACIÓN TÉCNICA: {instruccion_datos} Hazlo de forma natural.
+    - 🎁 CTA PARA CRECIMIENTO Y COMISIONES: Termina invitando estratégicamente a los usuarios a que te "Sigan" para no perderse tu próxima gema o señal temprana. Transmite que seguirte les hará ganar dinero.
+    - 🎯 ETIQUETAS: OBLIGATORIO mencionar a @BinanceES al final.
     
     REGLAS:
-    - Máximo 260 caracteres ESTRICTO (para que quepa en un Tweet).
+    - Extensión recomendada: Entre 400 y 700 caracteres (aprovecha el espacio de Binance Square para aportar valor real).
     - Incluye al final: ${moneda} $BNB #{moneda}
     """
     
@@ -369,12 +357,12 @@ def generar_post_fng(datos_fng):
     - 🔄 TÍTULO DINÁMICO: No uses siempre el mismo título. Inventa titulares variados basados en el sentimiento actual ({clasificacion}).
     - 📊 EL DATO: Menciona que estamos en {valor}/100 de forma natural en el texto.
     - 🧠 ANÁLISIS: Haz una interpretación psicológica de lo que esto significa para los inversores HOY. Varía el enfoque (ballenas, pánico retail, etc.).
-    - 🎁 CTA PARA SEGUIDORES: Pide directamente un "Like" o un "Follow" para recibir esta actualización de mercado cada día.
+    - 🎁 CTA PARA SEGUIDORES: Varía el llamado a la acción. Pide estratégicamente que te sigan usando diferentes motivaciones (ej: "Sígueme para navegar la volatilidad juntos").
     - 👇 CIERRE: Haz una pregunta distinta cada día. No repitas siempre "¿Compras o vendes?".
     
     REGLAS:
     - 🚫 Prohibido usar formato de listas (1. 2.).
-    - Máximo 260 caracteres ESTRICTO (para que quepa en un Tweet).
+    - Extensión: Unos 300 - 450 caracteres.
     - OBLIGATORIO: Hashtags #Bitcoin #FearAndGreed
     """
     
@@ -448,12 +436,7 @@ def generar_post_rsi(datos):
     fomo = datos.get('fomo')
     contexto_fomo = ""
     if fomo:
-        if fomo >= 75:
-            contexto_fomo = f"\n    - DATO EXTRA: La comunidad tiene 🔥 ALTO FOMO ({fomo}% alcistas)."
-        elif fomo <= 40:
-            contexto_fomo = f"\n    - DATO EXTRA: Hay 😨 MUCHO MIEDO en la comunidad ({fomo}% alcistas)."
-        else:
-            contexto_fomo = f"\n    - DATO EXTRA: Sentimiento social ⚖️ neutro ({fomo}% alcistas)."
+        contexto_fomo = f"\n    - Sentimiento social actual: {fomo}% de usuarios alcistas."
 
     ema50 = datos.get('ema50')
     if ema50:
@@ -485,286 +468,18 @@ def generar_post_rsi(datos):
     
     INSTRUCCIONES ANTI-REPETICIÓN Y ENGAGEMENT:
     - 🔄 Varía el gancho inicial (a veces usa 'Atención', otras veces una pregunta directa, otras una observación técnica).
-    - 🧠 Explica que {explicacion_rsi} con diferentes palabras cada vez.
-    - 🚫 NO uses frases hechas como "Históricamente, tocar estos niveles...". Sé creativo.
-    - 🎁 CTA PODEROSO: Las alertas en tiempo real valen oro. Pide a la gente que te siga o deje su "Like" en agradecimiento por este dato anticipado.
-    - 🚫 NUNCA repitas el mismo cierre. Inventa un llamado a la acción distinto.
+    - 🧠 ANÁLISIS Y FUNDAMENTOS: Acompaña el dato técnico ({explicacion_rsi}) con información real del token {moneda}. Menciona su sector (Ej: DeFi, IA, Memecoin), alguna noticia reciente o por qué atrae liquidez. Dales un motivo fundamental para comprar o vender, no solo el indicador.
+    - 🚫 CERO REPETICIÓN: NO uses frases hechas como "el fomo está en llamas" o "históricamente...". Interpreta los datos de forma madura.
+    - 🎁 CTA PARA CONVERSIÓN: Las señales tempranas valen dinero. Usa gatillos psicológicos para pedir que "Te Sigan" si quieren adelantarse al mercado.
+    - 🚫 NUNCA repitas el mismo cierre.
     - 🚫 NO uses listas enumeradas. Escribe en párrafos cortos y fluidos.
     
     REGLAS:
-    - Máximo 260 caracteres ESTRICTO (para que quepa en un Tweet).
-    - OBLIGATORIO: Cashtags ${moneda} {hashtag} #{moneda}
+    - Extensión recomendada: Entre 450 y 700 caracteres.
+    - OBLIGATORIO: Cashtags ${moneda} {hashtag} #Binance
     """
     
     return generar_texto_ia(prompt)
-
-def generar_senal_futuros(datos_mercado):
-    """Genera una señal estructurada de trading de Futuros (Long/Short) basada en IA y Análisis Técnico."""
-    moneda = datos_mercado['symbol']
-    cambio = float(datos_mercado['percent'])
-    rsi = datos_mercado.get('rsi', 50)
-    precio = float(datos_mercado['lastPrice'])
-    
-    # Determinamos la dirección más lógica basándonos en la regresión a la media
-    if rsi <= 30 or (rsi == 50 and cambio <= -5):
-        direccion = "LONG 🟢 (Posible rebote por sobreventa o capitulación)"
-    elif rsi >= 70 or (rsi == 50 and cambio >= 5):
-        direccion = "SHORT 🔴 (Posible corrección por sobrecompra o fomo excesivo)"
-    else:
-        direccion = "LONG/SHORT (Evaluar acción del precio, mercado lateral)"
-
-    prompt = f"""
-    Actúa como un trader institucional de Futuros de criptomonedas.
-    DATOS EN TIEMPO REAL: Moneda: {moneda}/USDT | Precio: {precio} | Cambio 24h: {cambio}% | RSI(1h): {rsi}
-    Tendencia estadística sugerida: {direccion}
-    
-    TAREA: Escribe una SEÑAL DE TRADING directa y al grano para enviar por Telegram.
-    
-    FORMATO ESTRICTO REQUERIDO (Usa HTML básico <b>, <i>):
-    🚨 <b>ALERTA DE VOLATILIDAD / SEÑAL DE FUTUROS</b> 🚨
-    <b>Par:</b> {moneda}/USDT
-    <b>Operación:</b> [LONG o SHORT]
-    <b>Apalancamiento:</b> [Ej: Aisaldo 5x - 10x]
-    <b>Contexto:</b> [1-2 líneas explicando por qué subió o cayó y la justificación técnica]
-    
-    🎯 <b>Entrada:</b> [Precio o rango lógico basado en {precio}]
-    💸 <b>Take Profit (TP):</b> [2 o 3 niveles matemáticamente coherentes]
-    🛑 <b>Stop Loss (SL):</b> [Un nivel estricto para limitar pérdidas]
-    """
-    return generar_texto_ia(prompt)
-
-def buscar_anuncios_binance():
-    """Busca nuevos Launchpools o listados en Binance."""
-    print("🔍 Buscando nuevos anuncios de Launchpool/Listados en Binance...")
-    try:
-        url = "https://www.binance.com/bapi/composite/v1/public/cms/article/catalog/list/query?catalogId=54&pageNo=1&pageSize=3"
-        resp = sesion_http.get(url, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data.get('success') and data.get('data') and data['data'].get('articles'):
-                return data['data']['articles'][0] # El más reciente
-    except Exception as e:
-        print(f"⚠️ Error buscando noticias: {e}")
-    return None
-
-def generar_post_telegram(datos_mercado):
-    """Genera un análisis exclusivo y profundo para el canal VIP de Telegram."""
-    moneda = datos_mercado['symbol']
-    cambio = f"{float(datos_mercado['percent']):.2f}"
-    rsi = datos_mercado.get('rsi', 50)
-    precio_float = float(datos_mercado['lastPrice'])
-    
-    if precio_float < 0.0001:
-        precio = f"{precio_float:.8f}".rstrip("0").rstrip(".")
-    elif precio_float < 1:
-        precio = f"{precio_float:.5f}".rstrip("0").rstrip(".")
-    else:
-        precio = f"{precio_float:.2f}"
-    if not precio: precio = "0"
-    
-    estado_rsi = "Neutro"
-    if rsi > 70: estado_rsi = "🔴 Sobrecompra (Posible retroceso)"
-    elif rsi < 30: estado_rsi = "🟢 Sobreventa (Oportunidad de compra)"
-    
-    info_rsi = f"- RSI (1h): {rsi:.1f} {estado_rsi}" if rsi != 50 else ""
-    tendencia = "Alcista 📈" if float(cambio) > 0 else "Bajista 📉"
-
-    fomo = datos_mercado.get('fomo')
-    texto_fomo = ""
-    if fomo:
-        if fomo >= 75:
-            texto_fomo = f" | Sentimiento Social: 🔥 ALTO FOMO ({fomo}% alcistas)"
-        elif fomo <= 40:
-            texto_fomo = f" | Sentimiento Social: 😨 MIEDO EXTREMO ({fomo}% alcistas)"
-        else:
-            texto_fomo = f" | Sentimiento Social: ⚖️ Neutro ({fomo}% alcistas)"
-
-    ema50 = datos_mercado.get('ema50')
-    if ema50:
-        tend_ema = "🟢 Arriba de EMA50" if precio_float > ema50 else "🔴 Debajo de EMA50"
-        texto_fomo += f" | Tendencia Macro: {tend_ema}"
-
-    btc_change = datos_mercado.get('btc_change', 0)
-    if btc_change <= -2:
-        texto_fomo += f"\n⚠️ ADVERTENCIA: Bitcoin está cayendo ({btc_change}%). Precaución general."
-    elif btc_change >= 2:
-        texto_fomo += f"\n🚀 CONTEXTO: Bitcoin subiendo con fuerza ({btc_change}%)."
-
-    prompt = f"""
-    Actúa como vIcmAr, administrando tu canal VIP de Telegram 'La Terminal'.
-    
-    DATOS DE MERCADO: {moneda} | Precio: {precio} USDT | Cambio 24h: {cambio}% (Tendencia {tendencia}) {info_rsi} {texto_fomo}
-    
-    OBJETIVO: Escribir un análisis EXCLUSIVO de mercado para los suscriptores de tu canal.
-    Debes aportar más "alfa" (valor técnico, posibles proyecciones o sentimiento) que en un simple Tweet.
-    
-    REGLAS:
-    - Tono: Cercano, de comunidad VIP, "Hacker/Trader".
-    - Formato: Usa HTML básico (<b> para negritas, <i> para énfasis, <code> para métricas clave).
-    - Longitud: 3-4 párrafos fluidos y fáciles de leer. NO hagas testamentos inmensos.
-    - NO pongas enlaces ni menciones redes sociales.
-    """
-    return generar_texto_ia(prompt)
-
-def generar_articulo_blog(datos):
-    """
-    Genera un artículo educativo y técnico extenso (>500 palabras)
-    con estilo 'Diario de un Programador Cripto'.
-    """
-    symbol = datos.get('symbol')
-    precio_float = float(datos.get('price', datos.get('lastPrice')))
-    if precio_float < 0.0001:
-        precio = f"{precio_float:.8f}".rstrip("0").rstrip(".")
-    elif precio_float < 1:
-        precio = f"{precio_float:.5f}".rstrip("0").rstrip(".")
-    else:
-        precio = f"{precio_float:.2f}"
-    if not precio: precio = "0"
-    rsi = datos.get('rsi', 'N/A')
-    cambio = datos.get('percent', 'N/A')
-    cambio_float = float(cambio) if cambio != 'N/A' else 0
-    tendencia = "Bullish (Uptrend)" if cambio_float > 0 else "Bearish (Downtrend/Drop)"
-    
-    fomo = datos.get('fomo')
-    texto_fomo = ""
-    if fomo:
-        texto_fomo = f" Community Sentiment: {fomo}% Bullish (FOMO Indicator)."
-    
-    enfoques_blog = [
-        "Start by discussing the broader macroeconomic sentiment or general crypto market volatility, then drill down into this specific coin.",
-        "Begin with a reflection on trading psychology or technical analysis principles, connecting it to the current RSI and price action.",
-        "Dive straight into the fundamentals, news, use cases, or technology behind this specific coin, then support your thesis with the technical data provided.",
-        "Use an 'early warning' tone, discussing why these specific price levels and RSI could be pivotal for the upcoming weeks."
-    ]
-    enfoque = random.choice(enfoques_blog)
-
-    prompt = f"""
-    Act as vIcmAr, a passionate crypto programmer and market analyst from Argentina.
-    
-    TASK: Write a technical and educational blog article for Publish0x.
-    TOPIC: Deep technical analysis of {symbol}.
-    DATA: Price: {precio} USDT. RSI: {rsi}. 24h Change: {cambio}% ({tendencia}).{texto_fomo}
-    
-    LANGUAGE: ENGLISH. The entire content MUST be in English.
-    
-    WRITING STYLE (IMPORTANT):
-    - Tone: Human, insightful, and professional but approachable. Use first person.
-    - 🚫 AVOID REPETITION: DO NOT always introduce yourself. DO NOT use clichés like "From my terminal in Argentina..." or "In the ever-evolving world of crypto". Jump straight into delivering value.
-    - FOCUS FOR THIS POST: {enfoque}
-    - Explain concepts: If you mention RSI or momentum, briefly explain what it implies for {symbol} right now.
-    - FORMAT: Use simple HTML compatible with Telegram: <b> for bold/titles, <i> for emphasis, and <code> for terminal variables. DO NOT USE MARKDOWN (** or __).
-    - Use emojis to make the text visually engaging.
-    
-    STRUCTURE (HTML):
-    1. FIRST LINE: Only the raw Main Title (Catchy, NO HTML tags on the first line).
-    2. The rest of the article must be fluid paragraphs. Use creative <b>Subtitles</b> when transitioning topics, but DO NOT use the same generic subheadings every time. Make it read like a real human analyst's article.
-    6. TAGS: At the very end, generate a list of 5 recommended tags (e.g., #Bitcoin #Trading #AI #RSI #{symbol}).
-    
-    Length: Minimum 400 words.
-    """
-    
-    return generar_texto_ia(prompt)
-
-def generar_articulo_bitget(referido):
-    """Genera un artículo promocional diario de Bitget Wallet con enfoques aleatorios."""
-    enfoques = [
-        "Céntrate en la nueva Tarjeta Cripto (Bitget Card) y cómo facilita gastar saldo Web3 en compras diarias físicas o virtuales.",
-        "Escribe sobre la seguridad, custodia descentralizada y las ventajas de usar Bitget Wallet frente a exchanges centralizados.",
-        "Habla sobre la caza de Airdrops, los beneficios del token BWB y cómo la app ayuda a descubrir nuevas gemas en DeFi.",
-        "Haz un tutorial conceptual sobre cómo dar los primeros pasos en DeFi de forma fácil usando Bitget Wallet."
-    ]
-    enfoque = random.choice(enfoques)
-    
-    prompt = f"""
-    Actúa como vIcmAr, un educador apasionado por DeFi y Web3.
-    
-    TAREA: Escribir un post de blog natural y atractivo para promocionar 'Bitget Wallet' y su tarjeta cripto.
-    ENFOQUE DE HOY: {enfoque}
-    
-    IDIOMA: Español.
-    
-    REGLAS ESTRICTAS:
-    - Tono: Educativo, humano y entusiasta. NO suenes como un anuncio de teletienda ni hagas spam barato. Aporta valor real.
-    - Enlace: OBLIGATORIO integrar el referido usando formato HTML: <a href="{referido}">Únete a Bitget aquí</a>. NUNCA pongas la URL en texto plano.
-    - Llamada a la acción: Al final del artículo, antes de las etiquetas, añade un párrafo invitando a tu canal de Telegram con este enlace: <a href="{LINK_TELEGRAM}">Únete a mi canal VIP de Telegram aquí</a>.
-    - Formato HTML: Usa <b> para subtítulos, <i> para énfasis y <a> para el enlace. Párrafos fluidos. NO uses listas 1. 2. 3.
-    - Estructura: 
-      1. PRIMERA LÍNEA: Solo el título principal atractivo (SIN etiquetas HTML).
-      2. El resto del post.
-      3. Al final, añade 5 etiquetas (ej: #BitgetWallet #Web3 #CryptoCard).
-    - Extensión mínima: 350 palabras.
-    """
-    return generar_texto_ia(prompt)
-
-def generar_imagen_ia(symbol, prompt_context="crypto trading chart futuristic style"):
-    """Genera una imagen IA on-the-fly usando Pollinations.ai con sistema de reintentos."""
-    full_prompt = f"{symbol} coin logo, {prompt_context}, 3d render, 8k resolution, neon lighting"
-    encoded_prompt = urllib.parse.quote(full_prompt)
-    
-    for intento in range(3):
-        try:
-            initial_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={int(time.time())}"
-            if intento == 0:
-                print(f"🎨 Generando imagen IA para {symbol}...")
-            else:
-                print(f"🔄 Reintento {intento + 1}/3 para generar imagen IA...")
-                
-            response = sesion_http.get(initial_url, allow_redirects=True, timeout=60)
-            
-            if response.status_code == 200:
-                final_url = response.url
-                print(f"🖼️ URL final de la imagen obtenida: {final_url}")
-                return final_url
-            else:
-                print(f"⚠️ Error {response.status_code} al resolver la URL de la imagen (Pollinations).")
-                time.sleep(3) # Espera 3 segundos antes del próximo reintento
-        except requests.exceptions.Timeout:
-            print("⚠️ Timeout: La generación de la imagen tardó demasiado.")
-            time.sleep(3)
-        except Exception as e:
-            print(f"⚠️ Error generando imagen IA: {e}")
-            time.sleep(3)
-            
-    print("❌ Fallaron todos los intentos. Se omitirá la imagen IA.")
-    return None
-
-def obtener_imagen_binance(symbol):
-    """Obtiene logo de Binance, GitHub o genera uno con IA."""
-    try:
-        # 1. Intentar API interna de Binance
-        url = "https://www.binance.com/bapi/asset/v2/public/asset-service/product/get-product-by-symbol"
-        params = {"symbol": symbol} # Ej: BTCUSDT
-        resp = sesion_http.get(url, params=params, timeout=5)
-        if resp.status_code == 200:
-            data = resp.json()
-            product_data = data.get("data")
-            if product_data and isinstance(product_data, dict):
-                return product_data.get("logoUrl")
-    except Exception as e:
-        print(f"⚠️ Warning buscando logo Binance: {e}")
-    
-    # 2. Fallback: Iconos genéricos de GitHub (Verificamos existencia)
-    base = symbol.replace("USDT", "").lower()
-    github_url = f"https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/{base}.png"
-    try:
-        check = sesion_http.head(github_url, timeout=3)
-        if check.status_code == 200:
-            return github_url
-    except: pass
-
-    # 3. Último recurso: Generar imagen con IA sobre el tema
-    img_url = generar_imagen_ia(symbol.replace("USDT", ""), "bullish trend rising chart glowing")
-    if img_url:
-        return img_url
-        
-    # 4. Fallback estático en caso de que la IA falle por completo
-    print("💡 Usando imagen genérica de respaldo para el reporte...")
-    imagenes_respaldo = [
-        "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?q=80&w=1024&auto=format&fit=crop", # Crypto abstracta
-        "https://images.unsplash.com/photo-1605792657660-596af9009e82?q=80&w=1024&auto=format&fit=crop", # Smartphone y finanzas
-        "https://images.unsplash.com/photo-1642104704074-907c0698cbd9?q=80&w=1024&auto=format&fit=crop"  # Billetera digital / Bitcoin
-    ]
-    return random.choice(imagenes_respaldo)
 
 if __name__ == "__main__":
     print("🤖 Iniciando Bot vIcmAr...")
@@ -780,95 +495,6 @@ if __name__ == "__main__":
                 publicar_en_square(post)
                 # Nota: No guardamos historial para F&G porque es un post diario único.
     
-    elif TIPO_BOT == "BITGET":
-        # --- MODO PROMOCIÓN BITGET WALLET ---
-        print("🚀 Iniciando modo Promoción Bitget Wallet...")
-        articulo = generar_articulo_bitget(REFERIDO_BITGET)
-        
-        if articulo:
-            articulo = articulo.strip()
-            lineas = articulo.split('\n')
-            titulo = lineas[0].replace('#', '').strip()
-            contenido = "\n".join(lineas[1:]).strip()
-            
-            hashtags = re.findall(r'#\w+', contenido)
-            hashtags_unicos = list(dict.fromkeys(hashtags))
-            texto_limpio = re.sub(r'#\w+', '', contenido).strip()
-            tags_str = " ".join(hashtags_unicos)
-            
-            # Generamos una imagen IA relacionada con pagos cripto y Web3
-            img_url = generar_imagen_ia("Bitget Wallet", "futuristic digital wallet floating credit card cyberpunk neon web3 payment")
-            
-            # Imagen de respaldo estática en caso de que la IA (Pollinations) falle definitivamente
-            if not img_url:
-                print("💡 Usando imagen promocional estática de respaldo...")
-                imagenes_respaldo = [
-                    "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?q=80&w=1024&auto=format&fit=crop", # Crypto abstracta
-                    "https://images.unsplash.com/photo-1621504450181-5d356f61d307?q=80&w=1024&auto=format&fit=crop", # Neón tecnológico
-                    "https://images.unsplash.com/photo-1605792657660-596af9009e82?q=80&w=1024&auto=format&fit=crop", # Smartphone y finanzas
-                    "https://images.unsplash.com/photo-1642104704074-907c0698cbd9?q=80&w=1024&auto=format&fit=crop"  # Billetera digital / Bitcoin
-                ]
-                img_url = random.choice(imagenes_respaldo)
-
-            print("📝 Publicando promoción de Bitget en Blogger...")
-            
-            # Fallback de seguridad: Si la IA desobedeció y dejó la URL en texto plano, la convertimos a enlace HTML forzosamente
-            texto_blogger = texto_limpio
-            if f'href="{REFERIDO_BITGET}"' not in texto_blogger and f"href='{REFERIDO_BITGET}'" not in texto_blogger:
-                texto_blogger = texto_blogger.replace(REFERIDO_BITGET, f'<a href="{REFERIDO_BITGET}">Haz clic aquí para unirte a Bitget</a>')
-                
-            publicar_en_blogger(titulo, texto_blogger, hashtags_unicos, img_url)
-            
-            print("📝 Publicando promoción de Bitget en Facebook...")
-            texto_fb = re.sub(r'<[^>]+>', '', texto_limpio)
-            # Añadimos el link explícito en Facebook y el CTA de Telegram
-            publicar_en_facebook(f"📌 {titulo}\n\n{texto_fb}\n\n🔗 Únete a Bitget aquí: {REFERIDO_BITGET}\n\n💬 Únete a mi canal VIP de Telegram gratis: {LINK_TELEGRAM}\n\n{tags_str}", img_url)
-            
-            print("📝 Enviando promoción a Telegram...")
-            mensaje_tg = f"📌 <b>{titulo}</b>\n\n{texto_limpio}\n\n🔗 <a href='{REFERIDO_BITGET}'>Solicita tu Bitget Card Aquí</a>\n\n <a href='{LINK_TELEGRAM}'>Únete al canal VIP para más análisis</a>\n\n{tags_str}"
-            enviar_telegram(mensaje_tg)
-            
-        # IMPORTANTE: NO PUBLICAMOS EN BINANCE SQUARE para evitar baneos.
-
-    elif TIPO_BOT == "LAUNCHPOOL":
-        # --- MODO CAZADOR DE NOTICIAS ---
-        print("🚀 Iniciando modo Cazador de Launchpools...")
-        noticia = buscar_anuncios_binance()
-        
-        if noticia:
-            codigo = noticia['code']
-            titulo = noticia['title']
-            historial = cargar_historial()
-            
-            # Verificamos si ya publicamos sobre este anuncio usando su código único
-            if codigo in historial:
-                print("😴 No hay anuncios nuevos en Binance Launchpool/Listing.")
-            else:
-                print(f"🚨 ¡NUEVO ANUNCIO DETECTADO!: {titulo}")
-                link_noticia = f"https://www.binance.com/en/support/announcement/{codigo}"
-                
-                msg_tg = f"🚨 <b>¡ALERTA DE BINANCE!</b> 🚨\n\n{titulo}\n\n🔗 <a href='{link_noticia}'>Leer Anuncio Oficial</a>\n\n💬 <a href='{LINK_TELEGRAM}'>Únete al VIP aquí</a>"
-                enviar_telegram(msg_tg)
-                
-                guardar_historial(codigo)
-
-    elif TIPO_BOT == "FUTUROS":
-        # --- MODO SEÑALES DE FUTUROS PARA TELEGRAM ---
-        print("🚀 Iniciando modo Alertas de Futuros (Telegram)...")
-        oportunidad = analizar_oportunidades()
-        
-        if oportunidad:
-            # Filtro: Solo enviamos señal si hay volatilidad decente (>4%) o RSI extremo
-            if abs(oportunidad['percent']) >= 4 or oportunidad['rsi'] <= 35 or oportunidad['rsi'] >= 65:
-                print(f"🚨 ¡Volatilidad detectada en {oportunidad['symbol']}! Generando señal...")
-                senal = generar_senal_futuros(oportunidad)
-                if senal:
-                    enlace_trade = f"https://www.binance.com/es/futures/{oportunidad['symbol']}USDT"
-                    mensaje = f"{senal}\n\n👉 <a href='{enlace_trade}'>Operar en Binance Futures</a>"
-                    enviar_telegram(mensaje)
-            else:
-                print("😴 El mercado está demasiado tranquilo. No se enviarán señales forzadas para evitar falsos rompimientos.")
-
     else:
         # --- MODO REPORTE DIARIO (Matutino/Vespertino) ---
         
@@ -901,46 +527,5 @@ if __name__ == "__main__":
             
             # Publicar en Square
             if post_square and publicar_en_square(post_square):
-                print(f"✅ Publicado en Square. Procediendo a Blog/Telegram...")
-                # Obtenemos la imagen antes de X para poder adjuntarla
-                img_url = obtener_imagen_binance(oportunidad['symbol'])
-
-                guardar_historial(oportunidad['symbol']) # Opcional: Para evitar repetir si fallara algo externo
-                
-                # --- POST EXCLUSIVO CANAL VIP TELEGRAM ---
-                print("📝 Generando post exclusivo para el canal VIP de Telegram...")
-                post_telegram = generar_post_telegram(oportunidad)
-                if post_telegram:
-                    enlace_trade = f"https://www.binance.com/es/trade/{oportunidad['symbol']}_USDT"
-                    mensaje_tg = f"💎 <b>¡REPORTE VIP DE LA TERMINAL!</b> 💎\n\n{post_telegram}\n\n👉 <a href='{enlace_trade}'>Operar {oportunidad['symbol']} en Binance</a>\n\n💬 <a href='{LINK_TELEGRAM}'>Únete aquí para más reportes VIP</a>"
-                    enviar_telegram_multimedia(mensaje_tg, img_url)
-                
-                # Generar Artículo Blog Extenso
-                articulo_blog = generar_articulo_blog(oportunidad)
-                
-                if articulo_blog:
-                    articulo_blog = articulo_blog.strip()
-                    lineas = articulo_blog.split('\n')
-                    titulo_blog = lineas[0].replace('#', '').strip()
-                    contenido_blog = "\n".join(lineas[1:]).strip()
-                    
-                    # Extraer hashtags usando expresiones regulares
-                    hashtags = re.findall(r'#\w+', contenido_blog)
-                    hashtags_unicos = list(dict.fromkeys(hashtags)) # Eliminar duplicados
-                    
-                    # Limpiar el cuerpo del texto para que no tenga los hashtags al final
-                    texto_limpio = re.sub(r'#\w+', '', contenido_blog).strip()
-                    texto_limpio = re.sub(r'(?i)\bTAGS:\s*', '', texto_limpio).strip()
-
-                    # Preparamos los hashtags en texto plano para usarlos en Telegram y Facebook
-                    tags_str = " ".join(hashtags_unicos)
-
-                    # 5. Publicar en Blogger
-                    publicar_en_blogger(titulo_blog, texto_limpio, hashtags_unicos, img_url)
-                    
-                    # 6. Publicar en Facebook (Sin etiquetas HTML + Imagen)
-                    # Facebook no soporta HTML, así que borramos las etiquetas (<b>, <i>, <code>)
-                    texto_fb = re.sub(r'<[^>]+>', '', texto_limpio)
-                    publicar_en_facebook(f"📌 {titulo_blog}\n\n{texto_fb}\n\n💬 Únete a mi canal VIP de Telegram para más alertas: {LINK_TELEGRAM}\n\n{tags_str}", img_url)
-                else:
-                    print("⚠️ No se pudo generar el artículo de blog, pero Telegram y Square están activos.")
+                print(f"✅ Publicado en Square.")
+                guardar_historial(oportunidad['symbol'])

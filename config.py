@@ -17,16 +17,6 @@ if "llama3-8b-8192" in GROQ_MODEL_NAME:
     GROQ_MODEL_NAME = "llama-3.3-70b-versatile"
 
 TIPO_BOT = os.getenv("TIPO_BOT", "TENDENCIA")
-REFERIDO_BITGET = os.getenv("REFERIDO_BITGET", "https://web3.bitget.com/share/1sEleg?inviteCode=vicmarsil18")
-LINK_TELEGRAM = os.getenv("LINK_TELEGRAM", "https://t.me/LaTerminaldevIcmAr")
-
-# Credenciales Redes
-TOKEN_TELEGRAM = os.getenv("TOKEN_TELEGRAM")
-ID_TELEGRAM = os.getenv("ID_TELEGRAM")
-ID_TELEGRAM_ADMIN = os.getenv("ID_TELEGRAM_ADMIN")
-BLOG_ID = os.getenv("BLOG_ID")
-FB_PAGE_ID = os.getenv("FB_PAGE_ID")
-FB_ACCESS_TOKEN = os.getenv("FB_ACCESS_TOKEN")
 
 TWITTER_API_KEY = os.getenv("TWITTER_API_KEY", "").strip() or None
 TWITTER_API_SECRET = os.getenv("TWITTER_API_SECRET", "").strip() or None

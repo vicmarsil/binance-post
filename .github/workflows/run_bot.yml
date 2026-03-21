@@ -33,7 +33,7 @@ jobs:
 
       - name: Instalar dependencias
         run: |
-          pip install requests groq python-dotenv google-api-python-client google-auth-httplib2 google-auth-oauthlib tweepy
+          pip install requests groq python-dotenv
 
       - name: Ejecutar Bot
         env:
@@ -41,14 +41,6 @@ jobs:
           SQUARE_API_KEY: ${{ secrets.SQUARE_API_KEY }}
           MODO_PRUEBA: ${{ inputs.modo_prueba || 'false' }} # False por defecto (cron), o lo que elijas manual
           GROQ_MODEL_NAME: "llama-3.3-70b-versatile" # 👈 Modelo de Groq a usar. Cambiar aquí si es deprecado.
-          TOKEN_TELEGRAM: ${{ secrets.TOKEN_TELEGRAM }}
-          ID_TELEGRAM: ${{ secrets.ID_TELEGRAM }}
-          ID_TELEGRAM_ADMIN: ${{ secrets.ID_TELEGRAM_ADMIN }}
-          P0X_EMAIL: ${{ secrets.P0X_EMAIL }}
-          P0X_PASSWORD: ${{ secrets.P0X_PASSWORD }}
-          BLOG_ID: ${{ secrets.BLOG_ID }}
-          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
-          FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}
         run: python main.py
 
       - name: Guardar base de datos (historial)
