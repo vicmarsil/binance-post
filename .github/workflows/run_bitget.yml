@@ -20,7 +20,6 @@ jobs:
       - name: Instalar dependencias
         run: |
           pip install requests groq python-dotenv selenium webdriver-manager google-api-python-client google-auth-httplib2 google-auth-oauthlib
-
       - name: Ejecutar Bot de Bitget
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
