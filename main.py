@@ -22,7 +22,7 @@ if ID_TELEGRAM and not (ID_TELEGRAM.lstrip('-').isdigit() or ID_TELEGRAM.startsw
 # Validación básica de seguridad
 if not GROQ_API_KEY:
     raise ValueError("❌ Error: La variable GROQ_API_KEY no está configurada.")
-if not MODO_PRUEBA and not SQUARE_API_KEY and TIPO_BOT not in ["BITGET", "LAUNCHPOOL"]:
+if not MODO_PRUEBA and not SQUARE_API_KEY and TIPO_BOT not in ["BITGET", "LAUNCHPOOL", "FUTUROS"]:
     raise ValueError("❌ Error: SQUARE_API_KEY es necesaria para publicar en Binance (MODO_PRUEBA=False). Revisa tus Secretos en GitHub.")
 if not MODO_PRUEBA and SQUARE_API_KEY:
     print(f"🔑 SQUARE_API_KEY cargada correctamente (Longitud: {len(SQUARE_API_KEY)})")
@@ -243,13 +243,16 @@ def generar_post_inteligente(datos_mercado):
     
     # Formateo visual más seguro para evitar precios en '0' o vacíos
     precio_float = float(datos_mercado['lastPrice'])
-    if precio_float < 1:
-        # Para monedas menores a 1$ (ej. TRX, ADA)
+    if precio_float < 0.0001:
+        # Para memecoins con muchos ceros (ej. PEPE, SHIB)
+        precio = f"{precio_float:.8f}".rstrip("0").rstrip(".")
+    elif precio_float < 1:
+        # Para monedas menores a 1$ pero sin tantos ceros (ej. TRX, ADA)
         precio = f"{precio_float:.5f}".rstrip("0").rstrip(".")
-        if not precio: precio = "0"
     else:
         # Para monedas como BTC, ETH, SOL
         precio = f"{precio_float:.2f}"
+    if not precio: precio = "0"
 
     # Contexto dinámico para que la IA tenga variedad en su análisis
     cambio_float = float(cambio)
@@ -434,10 +437,13 @@ def generar_post_rsi(datos):
     rsi = int(datos['rsi']) if datos['rsi'] else 50
     
     precio_float = float(datos['price'])
-    if precio_float < 1:
+    if precio_float < 0.0001:
         precio = f"{precio_float:.8f}".rstrip("0").rstrip(".")
+    elif precio_float < 1:
+        precio = f"{precio_float:.5f}".rstrip("0").rstrip(".")
     else:
         precio = f"{precio_float:.2f}"
+    if not precio: precio = "0"
     
     fomo = datos.get('fomo')
     contexto_fomo = ""
@@ -547,7 +553,14 @@ def generar_post_telegram(datos_mercado):
     cambio = f"{float(datos_mercado['percent']):.2f}"
     rsi = datos_mercado.get('rsi', 50)
     precio_float = float(datos_mercado['lastPrice'])
-    precio = f"{precio_float:.5f}".rstrip("0").rstrip(".") if precio_float < 1 else f"{precio_float:.2f}"
+    
+    if precio_float < 0.0001:
+        precio = f"{precio_float:.8f}".rstrip("0").rstrip(".")
+    elif precio_float < 1:
+        precio = f"{precio_float:.5f}".rstrip("0").rstrip(".")
+    else:
+        precio = f"{precio_float:.2f}"
+    if not precio: precio = "0"
     
     estado_rsi = "Neutro"
     if rsi > 70: estado_rsi = "🔴 Sobrecompra (Posible retroceso)"
