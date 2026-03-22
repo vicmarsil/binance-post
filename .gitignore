@@ -10,3 +10,6 @@ __pycache__/
 
 # Archivos compilados de Python
 *.pyc
+
+# Archivos de tokens/autenticación
+*.pickle
