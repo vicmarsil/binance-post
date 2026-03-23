@@ -503,11 +503,12 @@ def generar_post_publish0x(datos_mercado):
     Tu tarea es escribir un artículo EN INGLÉS sobre {moneda}.
 
     DEBES responder ÚNICAMENTE con un objeto JSON válido. No incluyas ningún texto fuera del JSON.
-    Estructura exacta del JSON (usa \\n\\n para los saltos de línea en el body):
+    REGLA CRÍTICA: NO uses saltos de línea reales (Enter) dentro del valor "body". Escribe literalmente los caracteres "\\n\\n" para separar los párrafos.
+    Estructura exacta del JSON:
     {{
         "title": "Escribe un título llamativo en inglés aquí",
         "image_prompt": "A high quality, cinematic, modern illustration representing {moneda} cryptocurrency, trading, and growth",
-        "body": "Escribe aquí 3 párrafos de análisis combinando la acción del precio actual con los fundamentos de {moneda}. Que sea atractivo y anime a dar propina (tip).",
+        "body": "Escribe aquí 3 párrafos de análisis combinando la acción del precio actual con los fundamentos de {moneda}. Que sea atractivo y anime a dar propina (tip). Usa \\n\\n para los saltos de línea.",
         "tags": ["crypto", "trading", "{moneda.lower()}", "altcoins", "investing"]
     }}
     """
@@ -574,7 +575,7 @@ if __name__ == "__main__":
                             # Extraer JSON de la respuesta
                             json_str = re.sub(r'```json\s*', '', post_publish0x)
                             json_str = re.sub(r'\s*```', '', json_str)
-                            datos_pub = json.loads(json_str.strip())
+                            datos_pub = json.loads(json_str.strip(), strict=False)
                             
                             # 1. Enviar Título
                             enviar_telegram(datos_pub.get("title", f"{oportunidad['symbol']} Update"))
