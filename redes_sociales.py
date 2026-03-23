@@ -22,3 +22,25 @@ def publicar_en_square(contenido):
     except Exception as e:
         print(f"⚠️ Error técnico en Square: {e}")
         return False
+
+def enviar_telegram(mensaje):
+    if not TOKEN_TELEGRAM or not ID_TELEGRAM:
+        print("⚠️ Credenciales de Telegram faltantes. No se enviará el mensaje.")
+        return False
+        
+    url = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendMessage"
+    payload = {
+        "chat_id": ID_TELEGRAM,
+        "text": mensaje
+    }
+    try:
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            print("✅ Mensaje enviado a Telegram correctamente.")
+            return True
+        else:
+            print(f"❌ Error al enviar a Telegram: {response.text}")
+            return False
+    except Exception as e:
+        print(f"⚠️ Error técnico con Telegram: {e}")
+        return False

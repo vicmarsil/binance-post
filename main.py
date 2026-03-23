@@ -11,7 +11,7 @@ import re
 import os
 
 from config import *
-from redes_sociales import publicar_en_square
+from redes_sociales import publicar_en_square, enviar_telegram
 
 # Validación básica de seguridad
 if not GROQ_API_KEY:
@@ -481,6 +481,40 @@ def generar_post_rsi(datos):
     
     return generar_texto_ia(prompt)
 
+def generar_post_publish0x(datos_mercado):
+    """Genera un artículo en inglés adaptado para la estructura de Publish0x."""
+    moneda = datos_mercado['symbol']
+    cambio = f"{float(datos_mercado['percent']):.2f}"
+    
+    precio_float = float(datos_mercado.get('lastPrice', datos_mercado.get('price', 0)))
+    if precio_float < 0.0001:
+        precio = f"{precio_float:.8f}".rstrip("0").rstrip(".")
+    elif precio_float < 1:
+        precio = f"{precio_float:.5f}".rstrip("0").rstrip(".")
+    else:
+        precio = f"{precio_float:.2f}"
+
+    prompt = f"""
+    Actúa como un escritor experto en criptomonedas para la plataforma de blogs 'Publish0x'.
+    Acabas de analizar {moneda}.
+    Precio actual: {precio} USDT.
+    Variación 24h: {cambio}%.
+
+    Tu tarea es escribir un artículo EN INGLÉS sobre {moneda} listo para que el usuario lo copie y pegue.
+
+    FORMATO ESTRICTO REQUERIDO:
+    TITLE: (Escribe un título llamativo en inglés aquí)
+    
+    IMAGE SUGGESTION: (Describe brevemente en inglés qué tipo de imagen de archivo gratuita el usuario debería usar de portada. Ej: 'A glowing chart going up with {moneda} logo on a dark background')
+    
+    BODY:
+    (Escribe aquí 3 párrafos de análisis combinando la acción del precio actual con los fundamentos de {moneda}. Que sea muy atractivo, fácil de leer y anime a los lectores a dejar una propina/tip).
+    
+    TAGS: 
+    (Proporciona 5 etiquetas separadas por comas SIN el símbolo #. Ej: crypto, trading, {moneda.lower()}, altcoins, investing)
+    """
+    return generar_texto_ia(prompt, temperatura=0.8)
+
 if __name__ == "__main__":
     print("🤖 Iniciando Bot vIcmAr...")
     print(f"⚙️ Versión 2.1 - Modelo: {GROQ_MODEL_NAME} | Modo: {TIPO_BOT}")
@@ -529,3 +563,16 @@ if __name__ == "__main__":
             if post_square and publicar_en_square(post_square):
                 print(f"✅ Publicado en Square.")
                 guardar_historial(oportunidad['symbol'])
+                
+                # --- NUEVO: Generar y enviar a Telegram para Publish0x ---
+                hora_actual_utc = datetime.now(timezone.utc).hour
+                hora_art = (hora_actual_utc - 3) % 24  # Hora en Argentina (UTC-3)
+                
+                if 6 <= hora_art < 23:
+                    print(f"📝 Generando artículo en inglés de {oportunidad['symbol']} para Publish0x...")
+                    post_publish0x = generar_post_publish0x(oportunidad)
+                    if post_publish0x:
+                        mensaje_tg = f"📰 NUEVO ARTÍCULO PARA PUBLISH0X ({oportunidad['symbol']})\n\n{post_publish0x}"
+                        enviar_telegram(mensaje_tg)
+                else:
+                    print(f"😴 Horario de descanso en Argentina ({hora_art}:00 hs). Se omite el envío a Telegram.")

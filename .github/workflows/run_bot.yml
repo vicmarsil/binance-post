@@ -39,6 +39,8 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           SQUARE_API_KEY: ${{ secrets.SQUARE_API_KEY }}
+          TOKEN_TELEGRAM: ${{ secrets.TOKEN_TELEGRAM }}
+          ID_TELEGRAM: ${{ secrets.ID_TELEGRAM }}
           MODO_PRUEBA: ${{ inputs.modo_prueba || 'false' }} # False por defecto (cron), o lo que elijas manual
           GROQ_MODEL_NAME: "llama-3.3-70b-versatile" # 👈 Modelo de Groq a usar. Cambiar aquí si es deprecado.
         run: python main.py

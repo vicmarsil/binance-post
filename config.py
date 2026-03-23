@@ -18,6 +18,9 @@ if "llama3-8b-8192" in GROQ_MODEL_NAME:
 
 TIPO_BOT = os.getenv("TIPO_BOT", "TENDENCIA")
 
+TOKEN_TELEGRAM = os.getenv("TOKEN_TELEGRAM", "").strip() or None
+ID_TELEGRAM = os.getenv("ID_TELEGRAM", "").strip() or None
+
 TWITTER_API_KEY = os.getenv("TWITTER_API_KEY", "").strip() or None
 TWITTER_API_SECRET = os.getenv("TWITTER_API_SECRET", "").strip() or None
 TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN", "").strip() or None
