@@ -11,7 +11,7 @@ import re
 import os
 
 from config import *
-from redes_sociales import publicar_en_square, enviar_telegram
+from redes_sociales import publicar_en_square, enviar_telegram, enviar_foto_telegram
 
 # Validación básica de seguridad
 if not GROQ_API_KEY:
@@ -500,20 +500,18 @@ def generar_post_publish0x(datos_mercado):
     Precio actual: {precio} USDT.
     Variación 24h: {cambio}%.
 
-    Tu tarea es escribir un artículo EN INGLÉS sobre {moneda} listo para que el usuario lo copie y pegue.
+    Tu tarea es escribir un artículo EN INGLÉS sobre {moneda}.
 
-    FORMATO ESTRICTO REQUERIDO:
-    TITLE: (Escribe un título llamativo en inglés aquí)
-    
-    IMAGE SUGGESTION: (Describe brevemente en inglés qué tipo de imagen de archivo gratuita el usuario debería usar de portada. Ej: 'A glowing chart going up with {moneda} logo on a dark background')
-    
-    BODY:
-    (Escribe aquí 3 párrafos de análisis combinando la acción del precio actual con los fundamentos de {moneda}. Que sea muy atractivo, fácil de leer y anime a los lectores a dejar una propina/tip).
-    
-    TAGS: 
-    (Proporciona 5 etiquetas separadas por comas SIN el símbolo #. Ej: crypto, trading, {moneda.lower()}, altcoins, investing)
+    DEBES responder ÚNICAMENTE con un objeto JSON válido. No incluyas ningún texto fuera del JSON.
+    Estructura exacta del JSON (usa \\n\\n para los saltos de línea en el body):
+    {{
+        "title": "Escribe un título llamativo en inglés aquí",
+        "image_prompt": "A high quality, cinematic, modern illustration representing {moneda} cryptocurrency, trading, and growth",
+        "body": "Escribe aquí 3 párrafos de análisis combinando la acción del precio actual con los fundamentos de {moneda}. Que sea atractivo y anime a dar propina (tip).",
+        "tags": ["crypto", "trading", "{moneda.lower()}", "altcoins", "investing"]
+    }}
     """
-    return generar_texto_ia(prompt, temperatura=0.8)
+    return generar_texto_ia(prompt, temperatura=0.2)
 
 if __name__ == "__main__":
     print("🤖 Iniciando Bot vIcmAr...")
@@ -572,7 +570,33 @@ if __name__ == "__main__":
                     print(f"📝 Generando artículo en inglés de {oportunidad['symbol']} para Publish0x...")
                     post_publish0x = generar_post_publish0x(oportunidad)
                     if post_publish0x:
-                        mensaje_tg = f"📰 NUEVO ARTÍCULO PARA PUBLISH0X ({oportunidad['symbol']})\n\n{post_publish0x}"
-                        enviar_telegram(mensaje_tg)
+                        try:
+                            # Extraer JSON de la respuesta
+                            json_str = re.sub(r'```json\s*', '', post_publish0x)
+                            json_str = re.sub(r'\s*```', '', json_str)
+                            datos_pub = json.loads(json_str.strip())
+                            
+                            # 1. Enviar Título
+                            enviar_telegram(datos_pub.get("title", f"{oportunidad['symbol']} Update"))
+                            time.sleep(1)
+                            
+                            # 2. Enviar Imagen (Generada vía IA on-the-fly)
+                            img_prompt = urllib.parse.quote(datos_pub.get("image_prompt", f"cryptocurrency {oportunidad['symbol']}"))
+                            img_url = f"https://image.pollinations.ai/prompt/{img_prompt}?width=800&height=400&nologo=true"
+                            enviar_foto_telegram(img_url)
+                            time.sleep(1)
+                            
+                            # 3. Enviar Cuerpo del artículo solo
+                            enviar_telegram(datos_pub.get("body", "Error obteniendo el cuerpo."))
+                            time.sleep(1)
+                            
+                            # 4. Enviar Tags separados, uno por uno
+                            for tag in datos_pub.get("tags", []):
+                                enviar_telegram(tag.replace("#", ""))
+                                time.sleep(0.5)
+                                
+                        except Exception as e:
+                            print(f"⚠️ Error procesando JSON para Publish0x: {e}")
+                            enviar_telegram(f"Error procesando JSON. Respuesta original:\n{post_publish0x}")
                 else:
                     print(f"😴 Horario de descanso en Argentina ({hora_art}:00 hs). Se omite el envío a Telegram.")

@@ -44,3 +44,20 @@ def enviar_telegram(mensaje):
     except Exception as e:
         print(f"⚠️ Error técnico con Telegram: {e}")
         return False
+
+def enviar_foto_telegram(url_imagen, caption=""):
+    if not TOKEN_TELEGRAM or not ID_TELEGRAM:
+        return False
+        
+    url = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendPhoto"
+    payload = {
+        "chat_id": ID_TELEGRAM,
+        "photo": url_imagen,
+        "caption": caption
+    }
+    try:
+        response = requests.post(url, json=payload)
+        return response.status_code == 200
+    except Exception as e:
+        print(f"⚠️ Error enviando foto a Telegram: {e}")
+        return False
