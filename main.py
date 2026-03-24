@@ -481,39 +481,6 @@ def generar_post_rsi(datos):
     
     return generar_texto_ia(prompt)
 
-def generar_post_publish0x(datos_mercado):
-    """Genera un artículo en inglés adaptado para la estructura de Publish0x."""
-    moneda = datos_mercado['symbol']
-    cambio = f"{float(datos_mercado['percent']):.2f}"
-    
-    precio_float = float(datos_mercado.get('lastPrice', datos_mercado.get('price', 0)))
-    if precio_float < 0.0001:
-        precio = f"{precio_float:.8f}".rstrip("0").rstrip(".")
-    elif precio_float < 1:
-        precio = f"{precio_float:.5f}".rstrip("0").rstrip(".")
-    else:
-        precio = f"{precio_float:.2f}"
-
-    prompt = f"""
-    Actúa como un escritor experto en criptomonedas para la plataforma de blogs 'Publish0x'.
-    Acabas de analizar {moneda}.
-    Precio actual: {precio} USDT.
-    Variación 24h: {cambio}%.
-
-    Tu tarea es escribir un artículo EN INGLÉS sobre {moneda}.
-
-    DEBES responder ÚNICAMENTE con un objeto JSON válido. No incluyas ningún texto fuera del JSON.
-    REGLA CRÍTICA: NO uses saltos de línea reales (Enter) dentro del valor "body". Escribe literalmente los caracteres "\\n\\n" para separar los párrafos.
-    Estructura exacta del JSON:
-    {{
-        "title": "Escribe un título llamativo en inglés aquí",
-        "image_prompt": "A high quality, cinematic, modern illustration representing {moneda} cryptocurrency, trading, and growth",
-        "body": "Escribe aquí 3 párrafos de análisis combinando la acción del precio actual con los fundamentos de {moneda}. Que sea atractivo y anime a dar propina (tip). Usa \\n\\n para los saltos de línea.",
-        "tags": ["crypto", "trading", "{moneda.lower()}", "altcoins", "investing"]
-    }}
-    """
-    return generar_texto_ia(prompt, temperatura=0.2)
-
 if __name__ == "__main__":
     print("🤖 Iniciando Bot vIcmAr...")
     print(f"⚙️ Versión 2.1 - Modelo: {GROQ_MODEL_NAME} | Modo: {TIPO_BOT}")
@@ -562,42 +529,6 @@ if __name__ == "__main__":
             if post_square and publicar_en_square(post_square):
                 print(f"✅ Publicado en Square.")
                 guardar_historial(oportunidad['symbol'])
-                
-                # --- NUEVO: Generar y enviar a Telegram para Publish0x ---
-                hora_actual_utc = datetime.now(timezone.utc).hour
-                hora_art = (hora_actual_utc - 3) % 24  # Hora en Argentina (UTC-3)
-                
-                if 6 <= hora_art < 23:
-                    print(f"📝 Generando artículo en inglés de {oportunidad['symbol']} para Publish0x...")
-                    post_publish0x = generar_post_publish0x(oportunidad)
-                    if post_publish0x:
-                        try:
-                            # Extraer JSON de la respuesta
-                            json_str = re.sub(r'```json\s*', '', post_publish0x)
-                            json_str = re.sub(r'\s*```', '', json_str)
-                            datos_pub = json.loads(json_str.strip(), strict=False)
-                            
-                            # 1. Enviar Título
-                            enviar_telegram(datos_pub.get("title", f"{oportunidad['symbol']} Update"))
-                            time.sleep(1)
-                            
-                            # 2. Enviar Imagen (Generada vía IA on-the-fly)
-                            img_prompt = urllib.parse.quote(datos_pub.get("image_prompt", f"cryptocurrency {oportunidad['symbol']}"))
-                            img_url = f"https://image.pollinations.ai/prompt/{img_prompt}?width=800&height=400&nologo=true"
-                            enviar_foto_telegram(img_url)
-                            time.sleep(1)
-                            
-                            # 3. Enviar Cuerpo del artículo solo
-                            enviar_telegram(datos_pub.get("body", "Error obteniendo el cuerpo."))
-                            time.sleep(1)
-                            
-                            # 4. Enviar Tags separados, uno por uno
-                            for tag in datos_pub.get("tags", []):
-                                enviar_telegram(tag.replace("#", ""))
-                                time.sleep(0.5)
-                                
-                        except Exception as e:
-                            print(f"⚠️ Error procesando JSON para Publish0x: {e}")
-                            enviar_telegram(f"Error procesando JSON. Respuesta original:\n{post_publish0x}")
-                else:
-                    print(f"😴 Horario de descanso en Argentina ({hora_art}:00 hs). Se omite el envío a Telegram.")
+
+                # Notificación simple a Telegram sobre la publicación en Square
+                enviar_telegram(f"✅ Publicado nuevo análisis de {oportunidad['symbol']} en Binance Square.")
